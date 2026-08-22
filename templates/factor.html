@@ -4008,6 +4008,11 @@ function factorApp() {
         gpFitnessMode: this.gpFitnessMode,
         // 阶段P3 数据降采样样本比例
         gpMaxSamples: this.gpMaxSamples,
+        // 早停/验证段/permutation/GPU (此前漏存, 关闭重开会重置为默认值)
+        gpEarlyStopGens: this.gpEarlyStopGens,   // 早停耐心(连续无改善代数, 0=关闭)
+        gpValRatio: this.gpValRatio,             // 验证段比例 (三重分段)
+        gpPermN: this.gpPermN,                   // permutation 打乱次数 (0=关闭)
+        gpUseGpu: this.gpUseGpu,                 // GPU 整树张量求值开关
         // 上次评价/合成的因子记忆 (替代 localStorage factor_last_eval / factor_last_multi)
         lastEvalFactor: this._lastEvalFactor || (this.selectedFactors && this.selectedFactors[0]) || '',
         lastMultiFactors: this._lastMultiFactors || '',
@@ -4102,6 +4107,11 @@ function factorApp() {
       if (s.gpNJobs != null) this.gpNJobs = Math.max(1, Number(s.gpNJobs) || 1);
       // 阶段P3 数据降采样样本比例
       if (s.gpMaxSamples != null) this.gpMaxSamples = Number(s.gpMaxSamples) > 0 ? Number(s.gpMaxSamples) : 1.0;
+      // 早停/验证段/permutation/GPU (与 savePageState 对应补恢复, 0 也需生效)
+      if (s.gpEarlyStopGens != null) this.gpEarlyStopGens = Number(s.gpEarlyStopGens) || 0;
+      if (s.gpValRatio != null) this.gpValRatio = Number(s.gpValRatio) || 0.15;
+      if (s.gpPermN != null) this.gpPermN = Number(s.gpPermN) || 200;
+      if (s.gpUseGpu != null) this.gpUseGpu = s.gpUseGpu;
       // 上次评价/合成的因子记忆
       if (s.lastEvalFactor) this._lastEvalFactor = s.lastEvalFactor;
       if (s.lastMultiFactors) this._lastMultiFactors = s.lastMultiFactors;
@@ -4223,11 +4233,11 @@ function factorApp() {
         if (token.stop) return;
         try {
           const r = await this.api('/api/factor/mining/status?kind=' + encodeURIComponent(kind));
-          if (!r || !r.found) { this.stopMiningWatcher(kind); return; }
+          if (!r || !r.found) { this.stopMiningWatcher(kind); this.resetMiningState(kind); return; }
           const st = r.job;
           if (st.status === 'running') this.applyMiningProgress(kind, st);
           else if (st.status === 'done') { this.stopMiningWatcher(kind); this.applyMiningDone(kind, st.result); }
-          else if (st.status === 'error') { this.stopMiningWatcher(kind); this.showToast('后台' + kind + '挖掘失败: ' + (st.error || ''), 'error'); }
+          else if (st.status === 'error') { this.stopMiningWatcher(kind); this.resetMiningState(kind); this.showToast('后台' + kind + '挖掘失败: ' + (st.error || ''), 'error'); }
         } catch (e) { /* 静默: 服务未就绪/无任务 */ }
       };
       const interval = setInterval(poll, 2000);
@@ -4239,6 +4249,12 @@ function factorApp() {
       if (t) { t.stop = true; if (t.interval) clearInterval(t.interval); }
       this.miningWatchers[kind] = null;
     },
+    // 后台任务消失(完成/清除/出错)且当前正显示该子页时, 复位"挖掘中"状态, 避免卡死
+    resetMiningState(kind) {
+      if (kind === 'gp' && this.miningSubTab === 'gp') { this.mining = false; this.gpProgress = null; }
+      else if (kind === 'llm_gp' && this.miningSubTab === 'llm_gp') { this.mining = false; this.llmGpProgress = null; }
+      else if (kind === 'rl' && this.miningSubTab === 'rl') { this.rlMining = false; this.rlProgress = null; }
+    },
     applyMiningProgress(kind, st) {
       const p = st.progress || {};
       if (kind === 'gp') {
@@ -4246,7 +4262,9 @@ function factorApp() {
         if (st.history && st.history.length) {
           const curve = [];
           for (const h of st.history) if (h.event === 'progress' && h.data && h.data.gen != null)
-            curve.push({gen: h.data.gen, best_fitness: h.data.best_fitness, avg_fitness: h.data.avg_fitness});
+            curve.push({gen: h.data.gen, best_fitness: h.data.best_fitness, avg_fitness: h.data.avg_fitness,
+                        best_val_fitness: h.data.best_val_fitness ?? null,
+                        avg_val_fitness: h.data.avg_val_fitness ?? null});
           if (curve.length) { this.gpLiveCurve = curve; this.$nextTick(() => this.drawGpCurve(curve)); }
         }
       } else if (kind === 'rl') {
@@ -4276,10 +4294,20 @@ function factorApp() {
         this.llmGpResult = result; this.llmGpSelected = [];
       }
     },
-    refreshMiningSubState() {
+    async refreshMiningSubState() {
       for (const k of ['gp','rl','llm_gp']) this.stopMiningWatcher(k);
       const v = this.miningSubTab || 'ml';
-      if (v === 'gp') { this.loadMineHistory(); this.startMiningWatcher('gp'); }
+      if (v === 'gp') {
+        // 竞态修复: 若后台有 running 的 GP 任务, 用实时进度续接 (不加载历史结果,
+        // 避免"先闪出上次100代曲线、再被当前进度覆盖"的现象)
+        let hasRunning = false;
+        try {
+          const r = await this.api('/api/factor/mining/status?kind=gp');
+          hasRunning = !!(r && r.found && r.job && r.job.status === 'running');
+        } catch (e) { hasRunning = false; }
+        if (!hasRunning) this.loadMineHistory();
+        this.startMiningWatcher('gp');
+      }
       else if (v === 'rl') { this.loadRlHistory(); this.startMiningWatcher('rl'); }
       else if (v === 'llm_gp') { this.loadLlmGpHistory(); this.startMiningWatcher('llm_gp'); }
     },
