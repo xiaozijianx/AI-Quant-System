@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>我的 AI 量化基金 -- AI 量化基金路演</title>
+<style>
+  body { font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif;
+         max-width: 1000px; margin: 0 auto; padding: 0; color: #2c3e50;
+         background: #f8f9fa; line-height: 1.7; }
+  .slide { background: #fff; margin: 24px 16px; padding: 40px 48px;
+           border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+           page-break-after: always; }
+  .slide h1 { font-size: 2.4em; color: #2c3e50; margin-bottom: 8px; }
+  .slide h2 { font-size: 1.8em; color: #3498db; margin-bottom: 14px;
+              padding-bottom: 8px; border-bottom: 3px solid #3498db; }
+  .slide h3 { color: #555; margin: 16px 0 8px; }
+  .slide p { margin-bottom: 12px; }
+  .cover { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #fff; text-align: center; padding: 80px 48px; }
+  .cover h1 { color: #fff; font-size: 3.2em; margin-bottom: 18px; }
+  .cover .slogan { font-size: 1.4em; opacity: 0.9; margin-bottom: 36px; }
+  .cover .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+                   max-width: 800px; margin: 0 auto; }
+  .cover .stat { background: rgba(255,255,255,0.1); padding: 24px;
+                  border-radius: 8px; }
+  .cover .stat .num { font-size: 2.4em; font-weight: 700; color: #ffe082; }
+  .cover .stat .label { font-size: 0.9em; opacity: 0.8; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.95em; }
+  th { background: #34495e; color: #fff; padding: 10px 14px; text-align: left; }
+  td { padding: 10px 14px; border: 1px solid #dee2e6; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 14px; margin: 16px 0; }
+  .role-card { padding: 16px; border-radius: 10px; background: #fafbfc;
+                border-top: 4px solid #3498db; }
+  .role-card.charles { border-color: #3498db; }
+  .role-card.zoe     { border-color: #9b59b6; }
+  .role-card.sophie  { border-color: #16a085; }
+  .role-card.kris    { border-color: #e74c3c; }
+  .role-card.trader  { border-color: #27ae60; }
+  .role-card .name { font-size: 1.2em; font-weight: 700; margin-bottom: 4px; }
+  .role-card .role { font-size: 0.85em; color: #555; margin-bottom: 8px; }
+  .role-card .desc { font-size: 0.88em; color: #666; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 4px;
+            font-size: 0.85em; font-weight: 600; color: #fff; }
+  .b-prod  { background: #27ae60; }
+  .b-prob  { background: #f39c12; }
+  .b-paper { background: #95a5a6; }
+  .b-inc   { background: #34495e; }
+  .b-ret   { background: #e74c3c; }
+  .arch-box { background: #fff3cd; border-left: 4px solid #f39c12;
+               padding: 14px 20px; border-radius: 0 8px 8px 0; margin: 14px 0;
+               font-family: "Cascadia Code","Consolas",monospace; white-space: pre; }
+  .key-num { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+              gap: 12px; margin: 16px 0; }
+  .kn { padding: 16px; background: #eaf4fe; border-radius: 8px; text-align: center; }
+  .kn .v { font-size: 1.8em; font-weight: 700; color: #3498db; }
+  .kn .l { font-size: 0.85em; color: #555; margin-top: 4px; }
+  .timeline { border-left: 3px solid #3498db; padding-left: 20px; margin: 16px 0; }
+  .ti { margin-bottom: 14px; position: relative; }
+  .ti::before { content: ""; position: absolute; left: -27px; top: 6px;
+                width: 12px; height: 12px; border-radius: 50%; background: #3498db; }
+  .ti .when { font-weight: 700; color: #3498db; }
+  .footer { text-align: center; color: #999; font-size: 0.85em; margin: 30px 0; padding: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ========== Slide 1: Cover ========== -->
+<div class="slide cover">
+  <h1>我的 AI 量化基金</h1>
+  <div class="slogan">团队作战 · 持续进化 · CEO 主导</div>
+  <div class="stats">
+    <div class="stat"><div class="num">6</div><div class="label">在用策略数</div></div>
+    <div class="stat"><div class="num">3</div><div class="label">主力策略</div></div>
+    <div class="stat"><div class="num">100 万</div><div class="label">管理资金</div></div>
+    <div class="stat"><div class="num">+128.0%</div><div class="label">年度表现</div></div>
+  </div>
+  <div style="margin-top:36px;font-size:0.85em;opacity:0.7">
+    生成时间: 2026-05-06 20:45 · 版本 v1.0 · 本简报由 AI 自动生成
+  </div>
+</div>
+
+<!-- ========== Slide 2: AI 团队 ========== -->
+<div class="slide">
+  <h2>1. 我的 AI 量化团队</h2>
+  <p>整个系统由 5 个 AI 角色组成 + 1 个人类 CEO (你) 总控:</p>
+  <div class="role-grid">
+    <div class="role-card charles">
+      <div class="name">Charles</div>
+      <div class="role">投研情报官</div>
+      <div class="desc">基于 nanobot + DeepAgents, 用国泰君安"五步法"写研报</div>
+    </div>
+    <div class="role-card zoe">
+      <div class="name">Zoe</div>
+      <div class="role">信号官 + 选股 (22章升级)</div>
+      <div class="desc">10 因子库 + IC 加权 + 行业中性化, 沪深 300 选股 + MACD/DQN/多因子合成 alpha 信号</div>
+    </div>
+    <div class="role-card kris">
+      <div class="name">Kris</div>
+      <div class="role">风控官</div>
+      <div class="desc">8 条核心规则 (单笔/价差/ATR/熔断/事件/VIX门控)</div>
+    </div>
+    <div class="role-card trader">
+      <div class="name">Trader</div>
+      <div class="role">执行官</div>
+      <div class="desc">miniQMT 实盘下单 + 心跳保活 + 自动重连</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Slide 3: System ========== -->
+<div class="slide">
+  <h2>2. 系统架构</h2>
+  <div class="arch-box">每日 8:50 cron      → 21章 dividend_watcher       (除权检测)
+                ↓
+每日 9:00 cron      → 22章 morning_brief.graph    (晨会工作流)
+                ↓ 输出 picked_stocks
+9:30~14:55 主循环   → 23章 live_loop.run_forever  (盘中闭环)
+                       ↓ 每分钟一次
+                  Charles + Zoe (信号 + 选股)
+                       ↓
+                  Kris 风控 (19章 8 条规则)
+                       ↓ 通过
+                  Trader 下单 (21章 miniQMTTraderV2)
+                       ↓
+                  alert_router 推送 (4 级路由)
+                       ↓
+                  写 live_state.json
+                ↓
+14:50 cron          → 收盘前 10 分钟告警
+                ↓
+16:00 cron          → 24章 attribution.brinson    (日终归因)</div>
+
+  <p>整个系统的"骨架"是 LangGraph (20章), 8 个独立模块通过 state JSON 文件协作:</p>
+  <table>
+    <tr><th>层</th><th>章节</th><th>核心代码</th></tr>
+    <tr><td>编排</td><td>20</td><td>LangGraph StateGraph + Conditional Edge + Interrupt</td></tr>
+    <tr><td>地基</td><td>21</td><td>盘口/除权/未来函数/成本/仓位/调度</td></tr>
+    <tr><td>投研</td><td>22</td><td>多因子 + 板块轮动 + 交易计划 + 晨会</td></tr>
+    <tr><td>实盘</td><td>23</td><td>主循环 + Gradio 控制台 + 龙头战法 + 4 级告警</td></tr>
+    <tr><td>进化</td><td>24</td><td>归因 + Walk-Forward + 生命周期 + 路演</td></tr>
+  </table>
+</div>
+
+<!-- ========== Slide 4: Strategies ========== -->
+<div class="slide">
+  <h2>3. 策略组合 (Strategy Portfolio)</h2>
+  <p>当前在用 <b>6</b> 个策略, 分布在 5 个生命周期阶段:</p>
+  <table>
+    <tr><th>策略</th><th>阶段</th><th>资金占比</th><th>30日 Sharpe</th><th>30日收益</th><th>最大回撤</th></tr>
+    <tr><td><code>dragon_first_board</code></td><td><span class="badge b-prod">production</span></td><td>30.0%</td><td>+1.20</td><td>+4.50%</td><td>1.80%</td></tr>
+    <tr><td><code>multi_factor_csi300</code></td><td><span class="badge b-prod">production</span></td><td>30.0%</td><td>+0.80</td><td>+2.20%</td><td>3.50%</td></tr>
+    <tr><td><code>sector_rotation</code></td><td><span class="badge b-prod">production</span></td><td>30.0%</td><td>+0.65</td><td>+1.80%</td><td>2.50%</td></tr>
+    <tr><td><code>dqn_ethan</code></td><td><span class="badge b-prob">probation</span></td><td>5.0%</td><td>+0.40</td><td>+1.20%</td><td>4.00%</td></tr>
+    <tr><td><code>breakout_naive</code></td><td><span class="badge b-paper">paper</span></td><td>0.0%</td><td>+0.00</td><td>+0.00%</td><td>0.00%</td></tr>
+    <tr><td><code>old_macd_naive</code></td><td><span class="badge b-ret">retired</span></td><td>0.0%</td><td>+0.15</td><td>-0.80%</td><td>6.20%</td></tr>
+  </table>
+
+  <h3>策略迁移哲学</h3>
+  <ul>
+    <li><b>孵化 → 纸交易</b>: Walk-Forward IS/OOS &gt; 0.7 (避免过拟合)</li>
+    <li><b>纸交易 → 试用</b>: 22 天纸面收益 &gt; 0 + 回撤 &lt; 5%</li>
+    <li><b>试用 → 主力</b>: 22 天实盘 Sharpe &gt; 0.5</li>
+    <li><b>主力 → 退役</b>: 连续 14 天 Sharpe &lt; 0.3 OR 回撤 &gt; 20%</li>
+  </ul>
+  <p>每周自动评估 + 自动迁移, <b>没有"人为偏好"</b>, 完全 KPI 驱动.</p>
+</div>
+
+<!-- ========== Slide 5: Performance ========== -->
+<div class="slide">
+  <h2>4. 业绩与归因</h2>
+
+  <div class="key-num">
+    <div class="kn"><div class="v">+128.0%</div><div class="l">年度收益</div></div>
+    <div class="kn"><div class="v">1.42</div><div class="l">年度 Sharpe</div></div>
+    <div class="kn"><div class="v">-3.20%</div><div class="l">最大回撤</div></div>
+    <div class="kn"><div class="v">96</div><div class="l">总交易笔数</div></div>
+  </div>
+
+  <h3>Brinson 归因 -- 收益拆解</h3>
+  <table>
+    <tr><th>来源</th><th>贡献</th><th>占比</th></tr>
+    <tr><td>配置效应 (行业 Beta)</td><td>+4.37%</td><td>77%</td></tr>
+    <tr><td>选股效应 (Alpha)</td><td>+1.26%</td><td>22%</td></tr>
+    <tr><td>交互效应</td><td>+0.08%</td><td>1%</td></tr>
+  </table>
+
+  <p style="font-style:italic;color:#666">
+    解读: 配置效应大 = 选对了赛道 (运气 / 择时); 选股效应大 = 选对了股 (实力 / Alpha).
+  </p>
+</div>
+
+<!-- ========== Slide 6: Risk Management ========== -->
+<div class="slide">
+  <h2>5. 风控体系 (Multi-Layer Risk Management)</h2>
+
+  <table>
+    <tr><th>层级</th><th>规则</th><th>实现章节</th></tr>
+    <tr><td>事前</td><td>单笔金额上限 / 价格偏离 / ST 黑名单 / ATR 仓位</td><td>19 章 PreTradeGuard</td></tr>
+    <tr><td>事中</td><td>单日亏损熔断 (默认 -2%) / ATR 止损</td><td>19 章 CircuitBreaker</td></tr>
+    <tr><td>外部</td><td>事件关键词 / VIX 宏观门控</td><td>19 章 EventLLMChecker + MacroGate</td></tr>
+    <tr><td>工程</td><td>心跳保活 / 自动重连 / 异常金字塔 (5 级)</td><td>21 章 trader_v2 + 23 章 live_loop</td></tr>
+    <tr><td>授权</td><td>CEO 控制台一键暂停 / 一键清仓</td><td>23 章 dashboard.py</td></tr>
+  </table>
+
+  <h3>4 级告警路由</h3>
+  <ul>
+    <li><b>INFO</b>: 信号 / 仓位变化 -- 钉钉聚合 30 分钟一批</li>
+    <li><b>WARN</b>: 风控否决 / 重试 -- 钉钉实时</li>
+    <li><b>CRITICAL</b>: 熔断 / 大额亏损 -- 钉钉 + 微信 + 邮件</li>
+    <li><b>FATAL</b>: 系统崩溃 -- 全部 + 重试 3 次</li>
+  </ul>
+</div>
+
+<!-- ========== Slide 7: Roadmap ========== -->
+<div class="slide">
+  <h2>6. Roadmap -- 接下来的 12 个月</h2>
+
+  <div class="timeline">
+    <div class="ti">
+      <div class="when">M+1 ~ M+3</div>
+      <p>稳定运行现有 5 个策略, 收集 3 个月实盘数据</p>
+    </div>
+    <div class="ti">
+      <div class="when">M+3 ~ M+6</div>
+      <p>加上财务因子 (用 tushare/wind 补 PE/PB/ROE), 多因子选股从沪深 300 扩到中证 500</p>
+    </div>
+    <div class="ti">
+      <div class="when">M+6 ~ M+9</div>
+      <p>引入期权对冲 (隐含波动率 / 备兑开仓 / 价差套利)</p>
+    </div>
+    <div class="ti">
+      <div class="when">M+9 ~ M+12</div>
+      <p>跨市场扩展 -- 港股通 / 美股 / 数字货币 (用同一套 LangGraph 编排)</p>
+    </div>
+  </div>
+
+  <h3>持续进化机制</h3>
+  <ul>
+    <li><b>周度</b>: 自动 Walk-Forward 复测, 检测过拟合</li>
+    <li><b>月度</b>: Brinson 归因 + 策略生命周期评估</li>
+    <li><b>季度</b>: A/B 测试新策略 (5% 资金试用)</li>
+    <li><b>年度</b>: 全面策略迭代 + 路演 (本文档)</li>
+  </ul>
+</div>
+
+<!-- ========== Slide 8: 结语 ========== -->
+<div class="slide">
+  <h2>结语 -- 投资是一场修行</h2>
+
+  <p style="font-size:1.1em;line-height:2">
+    经过 24 讲的学习, 我搭建了一套<b>从数据到执行</b>的完整 AI 量化系统.<br><br>
+
+    它不是"会自动赚钱的机器" -- 它是<b>把我的投资思想结构化、可重复、可改进</b>的工具.<br><br>
+
+    AI 是我的<b>伙伴</b>, 不是替代:
+    <ul>
+      <li>Charles 帮我看完今天 200 篇研报</li>
+      <li>Zoe 帮我从 5000 只股票里选出 30 只 (多因子) + 给信号</li>
+      <li>Kris 帮我守住每一笔订单的纪律</li>
+      <li>Trader 帮我在 3 秒内完成下单</li>
+      <li>但<b>我才是 CEO</b> -- 我决定方向, AI 执行</li>
+    </ul>
+  </p>
+
+  <p style="text-align:center;margin-top:30px;font-size:1.2em;color:#3498db;font-weight:600">
+    "投资是一场修行, 与你的 AI 伙伴共同成长."
+  </p>
+</div>
+
+<div class="footer">
+  本路演简报由 AI 量化系统自动生成 · 仅供参考, 不构成投资建议<br>
+  生成时间: 2026-05-06 20:45 · 项目: 我的 AI 量化基金
+</div>
+
+</body>
+</html>

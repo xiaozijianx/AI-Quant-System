@@ -1,0 +1,22 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 7,
+  "negative_count": 3,
+  "neutral_count": 1,
+  "top_themes": [
+    "康强电子回购股份",
+    "存储芯片概念",
+    "先进封装概念"
+  ],
+  "risk_alerts": [
+    "部分股票及板块主力资金净流出",
+    "存储芯片概念出现下跌情况"
+  ],
+  "opportunity_hints": [
+    "关注康强电子的回购和业绩表现",
+    "存储芯片及先进封装概念可能有持续上涨动力",
+    "核电概念或有资金流入机会"
+  ],
+  "summary": "市场整体情绪偏乐观，多只股票及概念板块表现积极，但需警惕部分资金流出风险。"
+}

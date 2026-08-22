@@ -1,0 +1,35 @@
+{
+  "summary": {
+    "total_news": 10,
+    "events_detected": 2,
+    "bullish_events": 1,
+    "bearish_events": 0,
+    "policy_events": 1
+  },
+  "events": [
+    {
+      "news_index": 9,
+      "news_preview": "同时，在常态化推进中期分红、多次分红方面，黔源电力董事长已提议开展2026年中期分红，而贵州茅台（600519.SH）、贵州燃气（600903.SH）、沃顿科技（000920.SZ）等多家公司均已作出明确规划。 业绩与回馈“双轮驱动” 贵州上市公司半年报预喜频传",
+      "detection_method": "keyword",
+      "event_type": "利好",
+      "event_category": "分红送转",
+      "matched_keywords": [
+        "分红"
+      ],
+      "signal": "关注",
+      "signal_reason": "高分红体现公司现金流充裕"
+    },
+    {
+      "news_index": 9,
+      "news_preview": "同时，在常态化推进中期分红、多次分红方面，黔源电力董事长已提议开展2026年中期分红，而贵州茅台（600519.SH）、贵州燃气（600903.SH）、沃顿科技（000920.SZ）等多家公司均已作出明确规划。 业绩与回馈“双轮驱动” 贵州上市公司半年报预喜频传",
+      "detection_method": "keyword",
+      "event_type": "政策",
+      "event_category": "产业政策",
+      "matched_keywords": [
+        "规划"
+      ],
+      "signal": "关注板块",
+      "signal_reason": "政策利好相关板块"
+    }
+  ]
+}

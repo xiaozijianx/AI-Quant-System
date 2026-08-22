@@ -1,0 +1,7 @@
+# -*- coding: utf-8 -*-
+# Charles System Prompt 增强层配置
+# 默认全部关闭，与 Cline 完全对齐
+enhancements:
+  enabled: false       # 总开关；false 时所有子开关强制关闭
+  tools_section: true  # 在 system prompt 中列出工具名和描述
+  mcp_section: true    # 在 system prompt 中列出 MCP 服务器

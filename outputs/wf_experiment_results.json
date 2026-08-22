@@ -1,0 +1,3871 @@
+{
+  "stocks": [
+    {
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "tag": "大盘价值, 长期上涨趋势"
+    },
+    {
+      "code": "510300.SH",
+      "name": "沪深300ETF",
+      "tag": "宽基指数, 弱趋势 + 频繁震荡"
+    },
+    {
+      "code": "002594.SZ",
+      "name": "比亚迪",
+      "tag": "强趋势成长, 大波动"
+    },
+    {
+      "code": "600036.SH",
+      "name": "招商银行",
+      "tag": "蓝筹, 大幅震荡"
+    },
+    {
+      "code": "159915.SZ",
+      "name": "创业板ETF",
+      "tag": "中小盘, 趋势 + 反弹强"
+    }
+  ],
+  "wf_simple": {
+    "train": 120,
+    "test": 60
+  },
+  "wf_ml": {
+    "train": 300,
+    "test": 120
+  },
+  "results": [
+    {
+      "label": "simple/double_ma",
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.028,
+      "avg_test_sharpe": 0.0,
+      "is_oos_ratio": 0.0,
+      "overfit_score": 1.0,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"ma_long\": 60, \"ma_short\": 10}": 6,
+        "{\"ma_long\": 20, \"ma_short\": 5}": 1,
+        "{\"ma_long\": 120, \"ma_short\": 20}": 2,
+        "{\"ma_long\": 60, \"ma_short\": 20}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.31,
+          "oos_sharpe": 0.0,
+          "is_ret": 2.59,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "double_ma"
+    },
+    {
+      "label": "simple/bollinger",
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.317,
+      "avg_test_sharpe": 0.373,
+      "is_oos_ratio": 0.283,
+      "overfit_score": 0.7168,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"std_n\": 2.0, \"window\": 20}": 4,
+        "{\"std_n\": 2.5, \"window\": 20}": 2,
+        "{\"std_n\": 1.5, \"window\": 10}": 3,
+        "{\"std_n\": 2.0, \"window\": 50}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.94,
+          "oos_sharpe": 0.0,
+          "is_ret": 6.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 2.75,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.54,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 1.81,
+          "oos_sharpe": 0.0,
+          "is_ret": 11.31,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 2.51,
+          "oos_sharpe": 1.81,
+          "is_ret": 11.48,
+          "oos_ret": 11.93
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "window": 50,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.49,
+          "oos_sharpe": 0.0,
+          "is_ret": 5.35,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "window": 50,
+            "std_n": 2.0
+          },
+          "is_sharpe": 2.09,
+          "oos_sharpe": 0.0,
+          "is_ret": 18.1,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 1.22,
+          "oos_sharpe": 0.0,
+          "is_ret": 6.47,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.35,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.49,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.6,
+          "oos_sharpe": 0.54,
+          "is_ret": 2.26,
+          "oos_ret": 1.54
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 0.73,
+          "oos_sharpe": 1.75,
+          "is_ret": 4.0,
+          "oos_ret": 7.38
+        }
+      ],
+      "elapsed_sec": 0.3,
+      "strategy": "bollinger"
+    },
+    {
+      "label": "simple/rsi",
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.11,
+      "avg_test_sharpe": 0.438,
+      "is_oos_ratio": 0.395,
+      "overfit_score": 0.6054,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"overbought\": 80, \"oversold\": 20, \"rsi_period\": 6}": 8,
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 21}": 1,
+        "{\"overbought\": 75, \"oversold\": 25, \"rsi_period\": 14}": 1,
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 14}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.49,
+          "oos_sharpe": 0.0,
+          "is_ret": 3.32,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 2.32,
+          "oos_sharpe": 0.0,
+          "is_ret": 7.13,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.11,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.5,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 1.58,
+          "oos_sharpe": 2.48,
+          "is_ret": 6.12,
+          "oos_ret": 14.79
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "rsi_period": 21,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 2.89,
+          "oos_sharpe": 0.0,
+          "is_ret": 32.44,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 25,
+            "overbought": 75
+          },
+          "is_sharpe": 2.54,
+          "oos_sharpe": 0.0,
+          "is_ret": 24.93,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 1.75,
+          "oos_sharpe": 0.0,
+          "is_ret": 11.19,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.53,
+          "oos_sharpe": 0.0,
+          "is_ret": 2.58,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 2.33,
+          "is_ret": 0.0,
+          "oos_ret": 10.59
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "rsi"
+    },
+    {
+      "label": "simple/donchian",
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": -0.082,
+      "avg_test_sharpe": -0.529,
+      "is_oos_ratio": 0,
+      "overfit_score": 0,
+      "verdict": "无明显过拟合",
+      "param_freq": {
+        "{\"entry_lookback\": 55, \"exit_lookback\": 20}": 4,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 10}": 2,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 5}": 2,
+        "{\"entry_lookback\": 10, \"exit_lookback\": 5}": 3
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.86,
+          "oos_sharpe": 0.0,
+          "is_ret": 5.54,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": -1.02,
+          "oos_sharpe": 0.0,
+          "is_ret": -1.62,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": -1.35,
+          "oos_sharpe": -3.3,
+          "is_ret": -4.81,
+          "oos_ret": -5.12
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.28,
+          "oos_sharpe": 0.91,
+          "is_ret": 3.09,
+          "oos_ret": 3.52
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.13,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.61,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.5,
+          "oos_sharpe": -0.14,
+          "is_ret": 3.72,
+          "oos_ret": 0.23
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": -0.3,
+          "oos_sharpe": -3.29,
+          "is_ret": -0.15,
+          "oos_ret": -2.5
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "donchian"
+    },
+    {
+      "label": "simple/double_ma",
+      "code": "510300.SH",
+      "name": "沪深300ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.086,
+      "avg_test_sharpe": -0.333,
+      "is_oos_ratio": -3.878,
+      "overfit_score": 4.8784,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"ma_long\": 60, \"ma_short\": 10}": 4,
+        "{\"ma_long\": 120, \"ma_short\": 20}": 2,
+        "{\"ma_long\": 30, \"ma_short\": 10}": 2,
+        "{\"ma_long\": 20, \"ma_short\": 5}": 2,
+        "{\"ma_long\": 30, \"ma_short\": 5}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.26,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.8,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.24,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.86,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.45,
+          "oos_sharpe": 0.0,
+          "is_ret": 5.03,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": -3.66,
+          "is_ret": 0.0,
+          "oos_ret": -2.3
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "double_ma"
+    },
+    {
+      "label": "simple/bollinger",
+      "code": "510300.SH",
+      "name": "沪深300ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.617,
+      "avg_test_sharpe": 0.574,
+      "is_oos_ratio": 0.355,
+      "overfit_score": 0.6452,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"std_n\": 2.0, \"window\": 20}": 3,
+        "{\"std_n\": 2.5, \"window\": 20}": 2,
+        "{\"std_n\": 2.0, \"window\": 30}": 3,
+        "{\"std_n\": 1.5, \"window\": 10}": 3
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.12,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.52,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 1.01,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.8,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.2,
+          "oos_sharpe": 2.79,
+          "is_ret": 3.63,
+          "oos_ret": 8.51
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.97,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.88,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.81,
+          "oos_sharpe": 0.0,
+          "is_ret": 8.51,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 2.21,
+          "oos_sharpe": 2.12,
+          "is_ret": 9.64,
+          "oos_ret": 1.97
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 3.33,
+          "oos_sharpe": 0.0,
+          "is_ret": 6.76,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 3.04,
+          "oos_sharpe": 1.15,
+          "is_ret": 8.78,
+          "oos_ret": 2.46
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 3.1,
+          "oos_sharpe": 0.25,
+          "is_ret": 12.26,
+          "oos_ret": 1.18
+        }
+      ],
+      "elapsed_sec": 0.4,
+      "strategy": "bollinger"
+    },
+    {
+      "label": "simple/rsi",
+      "code": "510300.SH",
+      "name": "沪深300ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.065,
+      "avg_test_sharpe": 0.495,
+      "is_oos_ratio": 0.464,
+      "overfit_score": 0.5359,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 14}": 5,
+        "{\"overbought\": 80, \"oversold\": 20, \"rsi_period\": 6}": 6
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 1.61,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.02,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 2.06,
+          "is_ret": 0.0,
+          "oos_ret": 4.41
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 2.11,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.64,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 2.16,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.84,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 3.71,
+          "oos_sharpe": 0.0,
+          "is_ret": 8.02,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 3.38,
+          "is_ret": 0.0,
+          "oos_ret": 6.67
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 2.13,
+          "oos_sharpe": 0.0,
+          "is_ret": 6.67,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.4,
+      "strategy": "rsi"
+    },
+    {
+      "label": "simple/donchian",
+      "code": "510300.SH",
+      "name": "沪深300ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.328,
+      "avg_test_sharpe": -0.654,
+      "is_oos_ratio": -1.996,
+      "overfit_score": 2.9959,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"entry_lookback\": 55, \"exit_lookback\": 20}": 3,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 10}": 4,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 5}": 2,
+        "{\"entry_lookback\": 10, \"exit_lookback\": 5}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": -1.36,
+          "oos_sharpe": 0.0,
+          "is_ret": -3.06,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 2.34,
+          "is_ret": 0.0,
+          "oos_ret": 4.49
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.6,
+          "oos_sharpe": -3.56,
+          "is_ret": 4.96,
+          "oos_ret": -1.7
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.19,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.62,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 1.11,
+          "oos_sharpe": -3.45,
+          "is_ret": 12.84,
+          "oos_ret": -3.72
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": -1.21,
+          "oos_sharpe": 0.39,
+          "is_ret": -4.48,
+          "oos_ret": 1.01
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.5,
+          "oos_sharpe": -2.91,
+          "is_ret": 8.09,
+          "oos_ret": -2.21
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.78,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.96,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "donchian"
+    },
+    {
+      "label": "simple/double_ma",
+      "code": "002594.SZ",
+      "name": "比亚迪",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.453,
+      "avg_test_sharpe": -0.591,
+      "is_oos_ratio": -1.306,
+      "overfit_score": 2.3061,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"ma_long\": 30, \"ma_short\": 10}": 1,
+        "{\"ma_long\": 60, \"ma_short\": 10}": 3,
+        "{\"ma_long\": 20, \"ma_short\": 5}": 3,
+        "{\"ma_long\": 30, \"ma_short\": 5}": 2,
+        "{\"ma_long\": 120, \"ma_short\": 20}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.29,
+          "oos_sharpe": -2.24,
+          "is_ret": 2.9,
+          "oos_ret": -5.4
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.37,
+          "oos_sharpe": 0.62,
+          "is_ret": 3.87,
+          "oos_ret": 2.51
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 1.16,
+          "oos_sharpe": 0.0,
+          "is_ret": 13.25,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 1.19,
+          "oos_sharpe": -3.26,
+          "is_ret": 10.02,
+          "oos_ret": -6.02
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.8,
+          "oos_sharpe": -1.62,
+          "is_ret": 10.99,
+          "oos_ret": -6.94
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 1.18,
+          "oos_sharpe": 0.0,
+          "is_ret": 17.02,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.8,
+      "strategy": "double_ma"
+    },
+    {
+      "label": "simple/bollinger",
+      "code": "002594.SZ",
+      "name": "比亚迪",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.283,
+      "avg_test_sharpe": -0.074,
+      "is_oos_ratio": -0.058,
+      "overfit_score": 1.0578,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"std_n\": 2.0, \"window\": 20}": 7,
+        "{\"std_n\": 2.0, \"window\": 50}": 1,
+        "{\"std_n\": 1.5, \"window\": 10}": 2,
+        "{\"std_n\": 2.0, \"window\": 30}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.83,
+          "oos_sharpe": 0.0,
+          "is_ret": 17.52,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 2.24,
+          "oos_sharpe": 0.0,
+          "is_ret": 10.03,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "window": 50,
+            "std_n": 2.0
+          },
+          "is_sharpe": 2.21,
+          "oos_sharpe": 0.0,
+          "is_ret": 19.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 1.17,
+          "oos_sharpe": -1.64,
+          "is_ret": 12.42,
+          "oos_ret": -4.82
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.28,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.71,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.51,
+          "oos_sharpe": 0.0,
+          "is_ret": 3.5,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.74,
+          "oos_sharpe": 0.0,
+          "is_ret": 18.46,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 2.42,
+          "oos_sharpe": 0.0,
+          "is_ret": 20.6,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 0.72,
+          "oos_sharpe": 0.83,
+          "is_ret": 6.17,
+          "oos_ret": 4.34
+        }
+      ],
+      "elapsed_sec": 0.3,
+      "strategy": "bollinger"
+    },
+    {
+      "label": "simple/rsi",
+      "code": "002594.SZ",
+      "name": "比亚迪",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.092,
+      "avg_test_sharpe": 0.512,
+      "is_oos_ratio": 0.469,
+      "overfit_score": 0.5312,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"overbought\": 80, \"oversold\": 20, \"rsi_period\": 6}": 8,
+        "{\"overbought\": 75, \"oversold\": 25, \"rsi_period\": 14}": 1,
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 21}": 1,
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 14}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.43,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.62,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 3.25,
+          "is_ret": 0.0,
+          "oos_ret": 19.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 25,
+            "overbought": 75
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 3.12,
+          "oos_sharpe": 0.0,
+          "is_ret": 35.86,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 3.33,
+          "oos_sharpe": 0.0,
+          "is_ret": 40.98,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "rsi_period": 21,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 1.59,
+          "oos_sharpe": 0.0,
+          "is_ret": 19.44,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 2.42,
+          "oos_sharpe": 0.0,
+          "is_ret": 20.6,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 1.13,
+          "oos_sharpe": -0.81,
+          "is_ret": 7.34,
+          "oos_ret": -3.51
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 3.19,
+          "is_ret": 0.0,
+          "oos_ret": 19.48
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "rsi"
+    },
+    {
+      "label": "simple/donchian",
+      "code": "002594.SZ",
+      "name": "比亚迪",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.623,
+      "avg_test_sharpe": -0.454,
+      "is_oos_ratio": -0.728,
+      "overfit_score": 1.7284,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"entry_lookback\": 10, \"exit_lookback\": 5}": 5,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 10}": 2,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 5}": 2,
+        "{\"entry_lookback\": 55, \"exit_lookback\": 20}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.07,
+          "oos_sharpe": 0.08,
+          "is_ret": 1.16,
+          "oos_ret": 0.67
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": -0.64,
+          "oos_sharpe": -3.19,
+          "is_ret": -1.91,
+          "oos_ret": -4.32
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 1.4,
+          "is_ret": 0.0,
+          "oos_ret": 7.49
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.91,
+          "oos_sharpe": 1.42,
+          "is_ret": 7.49,
+          "oos_ret": 5.18
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.97,
+          "oos_sharpe": 0.17,
+          "is_ret": 19.45,
+          "oos_ret": 0.95
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.66,
+          "oos_sharpe": -1.74,
+          "is_ret": 16.16,
+          "oos_ret": -3.15
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.94,
+          "oos_sharpe": -0.35,
+          "is_ret": 11.16,
+          "oos_ret": -1.72
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.99,
+          "oos_sharpe": -1.28,
+          "is_ret": 10.09,
+          "oos_ret": -3.45
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.97,
+          "oos_sharpe": -1.49,
+          "is_ret": 11.36,
+          "oos_ret": -5.71
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.4,
+      "strategy": "donchian"
+    },
+    {
+      "label": "simple/double_ma",
+      "code": "600036.SH",
+      "name": "招商银行",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.458,
+      "avg_test_sharpe": -0.313,
+      "is_oos_ratio": -0.682,
+      "overfit_score": 1.6823,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"ma_long\": 60, \"ma_short\": 10}": 2,
+        "{\"ma_long\": 120, \"ma_short\": 20}": 3,
+        "{\"ma_long\": 20, \"ma_short\": 5}": 4,
+        "{\"ma_long\": 30, \"ma_short\": 5}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 1.84,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.72,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 1.11,
+          "oos_sharpe": -3.44,
+          "is_ret": 6.0,
+          "oos_ret": -3.98
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.49,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.45,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 1.28,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.17,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.32,
+          "oos_sharpe": 0.0,
+          "is_ret": 2.2,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "double_ma"
+    },
+    {
+      "label": "simple/bollinger",
+      "code": "600036.SH",
+      "name": "招商银行",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.499,
+      "avg_test_sharpe": 0.409,
+      "is_oos_ratio": 0.273,
+      "overfit_score": 0.7271,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"std_n\": 2.5, \"window\": 20}": 3,
+        "{\"std_n\": 2.0, \"window\": 20}": 2,
+        "{\"std_n\": 1.5, \"window\": 10}": 4,
+        "{\"std_n\": 2.0, \"window\": 30}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.05,
+          "oos_sharpe": -1.41,
+          "is_ret": 6.39,
+          "oos_ret": -2.83
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 1.53,
+          "oos_sharpe": 0.0,
+          "is_ret": 9.18,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 0.5,
+          "oos_sharpe": -1.73,
+          "is_ret": 3.01,
+          "oos_ret": -3.59
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 3.32,
+          "oos_sharpe": 0.0,
+          "is_ret": 19.76,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 2.69,
+          "oos_sharpe": 0.0,
+          "is_ret": 12.23,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 1.76,
+          "oos_sharpe": 0.0,
+          "is_ret": 8.68,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 1.93,
+          "oos_sharpe": 2.38,
+          "is_ret": 8.68,
+          "oos_ret": 1.92
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 3.08,
+          "oos_sharpe": 3.25,
+          "is_ret": 7.27,
+          "oos_ret": 6.7
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 0.64,
+          "oos_sharpe": 2.01,
+          "is_ret": 4.04,
+          "oos_ret": 2.89
+        }
+      ],
+      "elapsed_sec": 0.7,
+      "strategy": "bollinger"
+    },
+    {
+      "label": "simple/rsi",
+      "code": "600036.SH",
+      "name": "招商银行",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 1.154,
+      "avg_test_sharpe": 0.106,
+      "is_oos_ratio": 0.092,
+      "overfit_score": 0.908,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"overbought\": 80, \"oversold\": 20, \"rsi_period\": 6}": 8,
+        "{\"overbought\": 75, \"oversold\": 25, \"rsi_period\": 14}": 3
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 25,
+            "overbought": 75
+          },
+          "is_sharpe": 1.29,
+          "oos_sharpe": 0.0,
+          "is_ret": 5.72,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 1.17,
+          "is_ret": 0.0,
+          "oos_ret": 3.48
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 25,
+            "overbought": 75
+          },
+          "is_sharpe": 2.92,
+          "oos_sharpe": 0.0,
+          "is_ret": 13.25,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.66,
+          "oos_sharpe": 0.0,
+          "is_ret": 3.48,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 25,
+            "overbought": 75
+          },
+          "is_sharpe": 2.86,
+          "oos_sharpe": 0.0,
+          "is_ret": 18.05,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 1.86,
+          "oos_sharpe": 0.0,
+          "is_ret": 7.56,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 3.11,
+          "oos_sharpe": 0.0,
+          "is_ret": 7.75,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 1.1,
+      "strategy": "rsi"
+    },
+    {
+      "label": "simple/donchian",
+      "code": "600036.SH",
+      "name": "招商银行",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.397,
+      "avg_test_sharpe": -0.481,
+      "is_oos_ratio": -1.212,
+      "overfit_score": 2.2118,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"entry_lookback\": 55, \"exit_lookback\": 20}": 3,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 5}": 1,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 10}": 3,
+        "{\"entry_lookback\": 10, \"exit_lookback\": 5}": 4
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.19,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.74,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": -0.12,
+          "is_ret": 0.0,
+          "oos_ret": 0.19
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.67,
+          "oos_sharpe": 0.32,
+          "is_ret": 8.03,
+          "oos_ret": 1.33
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.7,
+          "oos_sharpe": -0.18,
+          "is_ret": 4.87,
+          "oos_ret": 0.38
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.21,
+          "oos_sharpe": 1.96,
+          "is_ret": 11.63,
+          "oos_ret": 5.11
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 1.03,
+          "oos_sharpe": 0.0,
+          "is_ret": 6.74,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 1.47,
+          "oos_sharpe": -4.05,
+          "is_ret": 8.11,
+          "oos_ret": -1.95
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.49,
+          "oos_sharpe": -3.24,
+          "is_ret": 2.7,
+          "oos_ret": -4.03
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": -2.4,
+          "oos_sharpe": 0.0,
+          "is_ret": -3.04,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "donchian"
+    },
+    {
+      "label": "simple/double_ma",
+      "code": "159915.SZ",
+      "name": "创业板ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.153,
+      "avg_test_sharpe": -0.117,
+      "is_oos_ratio": -0.764,
+      "overfit_score": 1.7644,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"ma_long\": 60, \"ma_short\": 10}": 3,
+        "{\"ma_long\": 60, \"ma_short\": 20}": 1,
+        "{\"ma_long\": 30, \"ma_short\": 10}": 2,
+        "{\"ma_long\": 20, \"ma_short\": 5}": 2,
+        "{\"ma_long\": 30, \"ma_short\": 5}": 2,
+        "{\"ma_long\": 120, \"ma_short\": 20}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.36,
+          "oos_sharpe": 0.0,
+          "is_ret": 3.17,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.08,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.3,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": -1.28,
+          "is_ret": 0.0,
+          "oos_ret": -2.14
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 30
+          },
+          "is_sharpe": 1.24,
+          "oos_sharpe": 0.0,
+          "is_ret": 31.6,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "ma_short": 20,
+            "ma_long": 120
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 30
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "ma_short": 5,
+            "ma_long": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "ma_short": 10,
+            "ma_long": 60
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.6,
+      "strategy": "double_ma"
+    },
+    {
+      "label": "simple/bollinger",
+      "code": "159915.SZ",
+      "name": "创业板ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.951,
+      "avg_test_sharpe": 0.496,
+      "is_oos_ratio": 0.521,
+      "overfit_score": 0.4787,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"std_n\": 2.5, \"window\": 20}": 2,
+        "{\"std_n\": 2.0, \"window\": 30}": 1,
+        "{\"std_n\": 2.0, \"window\": 20}": 3,
+        "{\"std_n\": 1.5, \"window\": 10}": 4,
+        "{\"std_n\": 2.0, \"window\": 50}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "window": 30,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.72,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.65,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.14,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.54,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 0.42,
+          "oos_sharpe": -0.38,
+          "is_ret": 3.87,
+          "oos_ret": -1.67
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "window": 50,
+            "std_n": 2.0
+          },
+          "is_sharpe": 0.06,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.96,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 1.12,
+          "oos_sharpe": 1.07,
+          "is_ret": 10.48,
+          "oos_ret": 2.73
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 1.13,
+          "oos_sharpe": 2.56,
+          "is_ret": 10.29,
+          "oos_ret": 6.72
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "window": 20,
+            "std_n": 2.5
+          },
+          "is_sharpe": 3.24,
+          "oos_sharpe": 0.0,
+          "is_ret": 14.76,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "window": 10,
+            "std_n": 1.5
+          },
+          "is_sharpe": 1.62,
+          "oos_sharpe": 1.12,
+          "is_ret": 6.72,
+          "oos_ret": 3.93
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "window": 20,
+            "std_n": 2.0
+          },
+          "is_sharpe": 2.02,
+          "oos_sharpe": 1.09,
+          "is_ret": 12.98,
+          "oos_ret": 6.44
+        }
+      ],
+      "elapsed_sec": 0.5,
+      "strategy": "bollinger"
+    },
+    {
+      "label": "simple/rsi",
+      "code": "159915.SZ",
+      "name": "创业板ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.447,
+      "avg_test_sharpe": 0.437,
+      "is_oos_ratio": 0.979,
+      "overfit_score": 0.0211,
+      "verdict": "无明显过拟合",
+      "param_freq": {
+        "{\"overbought\": 80, \"oversold\": 20, \"rsi_period\": 6}": 7,
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 14}": 3,
+        "{\"overbought\": 70, \"oversold\": 30, \"rsi_period\": 21}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 3.32,
+          "is_ret": 0.0,
+          "oos_ret": 13.89
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 2.22,
+          "oos_sharpe": 1.49,
+          "is_ret": 13.89,
+          "oos_ret": 6.2
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.45,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.33,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "rsi_period": 21,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 2.24,
+          "oos_sharpe": 0.0,
+          "is_ret": 24.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "rsi_period": 14,
+            "oversold": 30,
+            "overbought": 70
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "rsi_period": 6,
+            "oversold": 20,
+            "overbought": 80
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        }
+      ],
+      "elapsed_sec": 0.6,
+      "strategy": "rsi"
+    },
+    {
+      "label": "simple/donchian",
+      "code": "159915.SZ",
+      "name": "创业板ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 120,
+      "wf_test": 60,
+      "n_windows": 11,
+      "avg_train_sharpe": 0.651,
+      "avg_test_sharpe": -0.355,
+      "is_oos_ratio": -0.545,
+      "overfit_score": 1.5447,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"entry_lookback\": 55, \"exit_lookback\": 20}": 4,
+        "{\"entry_lookback\": 20, \"exit_lookback\": 10}": 5,
+        "{\"entry_lookback\": 10, \"exit_lookback\": 5}": 2
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2023-07-13",
+          "test": "2023-07-14~2023-10-13",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 1,
+          "train": "2023-04-14~2023-10-13",
+          "test": "2023-10-16~2024-01-08",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 2,
+          "train": "2023-07-14~2024-01-08",
+          "test": "2024-01-09~2024-04-11",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 3,
+          "train": "2023-10-16~2024-04-11",
+          "test": "2024-04-12~2024-07-10",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.56,
+          "oos_sharpe": 0.0,
+          "is_ret": 4.15,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 4,
+          "train": "2024-01-09~2024-07-10",
+          "test": "2024-07-11~2024-10-11",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.06,
+          "oos_sharpe": 0.0,
+          "is_ret": 1.24,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 5,
+          "train": "2024-04-12~2024-10-11",
+          "test": "2024-10-14~2025-01-10",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": -1.98,
+          "is_ret": 0.0,
+          "oos_ret": -9.07
+        },
+        {
+          "win": 6,
+          "train": "2024-07-11~2025-01-10",
+          "test": "2025-01-13~2025-04-15",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 0.96,
+          "oos_sharpe": -1.29,
+          "is_ret": 21.64,
+          "oos_ret": -2.61
+        },
+        {
+          "win": 7,
+          "train": "2024-10-14~2025-04-15",
+          "test": "2025-04-16~2025-07-14",
+          "params": {
+            "entry_lookback": 55,
+            "exit_lookback": 20
+          },
+          "is_sharpe": 0.0,
+          "oos_sharpe": 0.0,
+          "is_ret": 0.0,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 8,
+          "train": "2025-01-13~2025-07-14",
+          "test": "2025-07-15~2025-10-14",
+          "params": {
+            "entry_lookback": 10,
+            "exit_lookback": 5
+          },
+          "is_sharpe": 0.4,
+          "oos_sharpe": 2.37,
+          "is_ret": 3.29,
+          "oos_ret": 17.09
+        },
+        {
+          "win": 9,
+          "train": "2025-04-16~2025-10-14",
+          "test": "2025-10-15~2026-01-08",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 3.49,
+          "oos_sharpe": 0.0,
+          "is_ret": 49.41,
+          "oos_ret": 0.0
+        },
+        {
+          "win": 10,
+          "train": "2025-07-15~2026-01-08",
+          "test": "2026-01-09~2026-04-13",
+          "params": {
+            "entry_lookback": 20,
+            "exit_lookback": 10
+          },
+          "is_sharpe": 1.69,
+          "oos_sharpe": -3.0,
+          "is_ret": 20.6,
+          "oos_ret": -8.94
+        }
+      ],
+      "elapsed_sec": 0.4,
+      "strategy": "donchian"
+    },
+    {
+      "label": "ml/ml_prob",
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 300,
+      "wf_test": 120,
+      "n_windows": 4,
+      "avg_train_sharpe": -0.257,
+      "avg_test_sharpe": -0.506,
+      "is_oos_ratio": 0,
+      "overfit_score": 0,
+      "verdict": "无明显过拟合",
+      "param_freq": {
+        "{\"buy_th\": 0.55, \"retrain_interval\": 40, \"sell_th\": 0.45, \"train_days\": 180}": 2,
+        "{\"buy_th\": 0.6, \"retrain_interval\": 20, \"sell_th\": 0.4, \"train_days\": 120}": 1,
+        "{\"buy_th\": 0.55, \"retrain_interval\": 20, \"sell_th\": 0.45, \"train_days\": 120}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2024-04-11",
+          "test": "2024-04-12~2024-10-11",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.61,
+          "oos_sharpe": -0.01,
+          "is_ret": 9.5,
+          "oos_ret": 0.09
+        },
+        {
+          "win": 1,
+          "train": "2023-07-14~2024-10-11",
+          "test": "2024-10-14~2025-04-15",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.25,
+          "oos_sharpe": -1.53,
+          "is_ret": 6.02,
+          "oos_ret": -6.14
+        },
+        {
+          "win": 2,
+          "train": "2024-01-09~2025-04-15",
+          "test": "2025-04-16~2025-10-14",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.6,
+            "sell_th": 0.4
+          },
+          "is_sharpe": -0.31,
+          "oos_sharpe": -1.74,
+          "is_ret": -3.84,
+          "oos_ret": -6.59
+        },
+        {
+          "win": 3,
+          "train": "2024-07-11~2025-10-14",
+          "test": "2025-10-15~2026-04-13",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": -1.58,
+          "oos_sharpe": 1.26,
+          "is_ret": -11.46,
+          "oos_ret": 10.21
+        }
+      ],
+      "elapsed_sec": 116.4,
+      "strategy": "ml_prob"
+    },
+    {
+      "label": "ml/ml_prob",
+      "code": "510300.SH",
+      "name": "沪深300ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 300,
+      "wf_test": 120,
+      "n_windows": 4,
+      "avg_train_sharpe": 0.165,
+      "avg_test_sharpe": -0.605,
+      "is_oos_ratio": -3.662,
+      "overfit_score": 4.6621,
+      "verdict": "严重过拟合",
+      "param_freq": {
+        "{\"buy_th\": 0.55, \"retrain_interval\": 20, \"sell_th\": 0.45, \"train_days\": 120}": 1,
+        "{\"buy_th\": 0.55, \"retrain_interval\": 40, \"sell_th\": 0.45, \"train_days\": 180}": 2,
+        "{\"buy_th\": 0.6, \"retrain_interval\": 20, \"sell_th\": 0.4, \"train_days\": 120}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2024-04-11",
+          "test": "2024-04-12~2024-10-11",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": -0.53,
+          "oos_sharpe": -1.84,
+          "is_ret": -0.39,
+          "oos_ret": -4.67
+        },
+        {
+          "win": 1,
+          "train": "2023-07-14~2024-10-11",
+          "test": "2024-10-14~2025-04-15",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.84,
+          "oos_sharpe": -1.74,
+          "is_ret": 16.03,
+          "oos_ret": -8.5
+        },
+        {
+          "win": 2,
+          "train": "2024-01-09~2025-04-15",
+          "test": "2025-04-16~2025-10-14",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.6,
+            "sell_th": 0.4
+          },
+          "is_sharpe": -0.63,
+          "oos_sharpe": 1.35,
+          "is_ret": -4.84,
+          "oos_ret": 6.12
+        },
+        {
+          "win": 3,
+          "train": "2024-07-11~2025-10-14",
+          "test": "2025-10-15~2026-04-13",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.98,
+          "oos_sharpe": -0.19,
+          "is_ret": 9.3,
+          "oos_ret": -0.15
+        }
+      ],
+      "elapsed_sec": 34.3,
+      "strategy": "ml_prob"
+    },
+    {
+      "label": "ml/ml_prob",
+      "code": "002594.SZ",
+      "name": "比亚迪",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 300,
+      "wf_test": 120,
+      "n_windows": 4,
+      "avg_train_sharpe": 0.775,
+      "avg_test_sharpe": 0.484,
+      "is_oos_ratio": 0.624,
+      "overfit_score": 0.3761,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"buy_th\": 0.55, \"retrain_interval\": 40, \"sell_th\": 0.45, \"train_days\": 180}": 3,
+        "{\"buy_th\": 0.55, \"retrain_interval\": 20, \"sell_th\": 0.45, \"train_days\": 120}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2024-04-11",
+          "test": "2024-04-12~2024-10-11",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 1.26,
+          "oos_sharpe": 1.71,
+          "is_ret": 21.03,
+          "oos_ret": 24.22
+        },
+        {
+          "win": 1,
+          "train": "2023-07-14~2024-10-11",
+          "test": "2024-10-14~2025-04-15",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 1.48,
+          "oos_sharpe": 1.25,
+          "is_ret": 39.07,
+          "oos_ret": 17.55
+        },
+        {
+          "win": 2,
+          "train": "2024-01-09~2025-04-15",
+          "test": "2025-04-16~2025-10-14",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.85,
+          "oos_sharpe": -1.97,
+          "is_ret": 20.96,
+          "oos_ret": -15.99
+        },
+        {
+          "win": 3,
+          "train": "2024-07-11~2025-10-14",
+          "test": "2025-10-15~2026-04-13",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": -0.49,
+          "oos_sharpe": 0.94,
+          "is_ret": -7.69,
+          "oos_ret": 9.7
+        }
+      ],
+      "elapsed_sec": 21.6,
+      "strategy": "ml_prob"
+    },
+    {
+      "label": "ml/ml_prob",
+      "code": "600036.SH",
+      "name": "招商银行",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 300,
+      "wf_test": 120,
+      "n_windows": 4,
+      "avg_train_sharpe": 0.214,
+      "avg_test_sharpe": 0.116,
+      "is_oos_ratio": 0.543,
+      "overfit_score": 0.4569,
+      "verdict": "中度过拟合",
+      "param_freq": {
+        "{\"buy_th\": 0.55, \"retrain_interval\": 20, \"sell_th\": 0.45, \"train_days\": 120}": 1,
+        "{\"buy_th\": 0.55, \"retrain_interval\": 40, \"sell_th\": 0.45, \"train_days\": 180}": 2,
+        "{\"buy_th\": 0.6, \"retrain_interval\": 20, \"sell_th\": 0.4, \"train_days\": 120}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2024-04-11",
+          "test": "2024-04-12~2024-10-11",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": -0.19,
+          "oos_sharpe": -0.99,
+          "is_ret": 0.65,
+          "oos_ret": -3.45
+        },
+        {
+          "win": 1,
+          "train": "2023-07-14~2024-10-11",
+          "test": "2024-10-14~2025-04-15",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.14,
+          "oos_sharpe": 1.64,
+          "is_ret": 3.98,
+          "oos_ret": 8.52
+        },
+        {
+          "win": 2,
+          "train": "2024-01-09~2025-04-15",
+          "test": "2025-04-16~2025-10-14",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.53,
+          "oos_sharpe": -0.25,
+          "is_ret": 6.39,
+          "oos_ret": -0.02
+        },
+        {
+          "win": 3,
+          "train": "2024-07-11~2025-10-14",
+          "test": "2025-10-15~2026-04-13",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.6,
+            "sell_th": 0.4
+          },
+          "is_sharpe": 0.37,
+          "oos_sharpe": 0.07,
+          "is_ret": 7.16,
+          "oos_ret": 1.31
+        }
+      ],
+      "elapsed_sec": 25.2,
+      "strategy": "ml_prob"
+    },
+    {
+      "label": "ml/ml_prob",
+      "code": "159915.SZ",
+      "name": "创业板ETF",
+      "n_data": 796,
+      "data_period": "2023-01-12 ~ 2026-05-08",
+      "wf_train": 300,
+      "wf_test": 120,
+      "n_windows": 4,
+      "avg_train_sharpe": 0.544,
+      "avg_test_sharpe": 0.589,
+      "is_oos_ratio": 1.083,
+      "overfit_score": -0.0829,
+      "verdict": "无明显过拟合",
+      "param_freq": {
+        "{\"buy_th\": 0.55, \"retrain_interval\": 40, \"sell_th\": 0.45, \"train_days\": 180}": 3,
+        "{\"buy_th\": 0.55, \"retrain_interval\": 20, \"sell_th\": 0.45, \"train_days\": 120}": 1
+      },
+      "by_window": [
+        {
+          "win": 0,
+          "train": "2023-01-12~2024-04-11",
+          "test": "2024-04-12~2024-10-11",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.61,
+          "oos_sharpe": 0.68,
+          "is_ret": 10.56,
+          "oos_ret": 4.26
+        },
+        {
+          "win": 1,
+          "train": "2023-07-14~2024-10-11",
+          "test": "2024-10-14~2025-04-15",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.74,
+          "oos_sharpe": -1.21,
+          "is_ret": 9.82,
+          "oos_ret": -13.43
+        },
+        {
+          "win": 2,
+          "train": "2024-01-09~2025-04-15",
+          "test": "2025-04-16~2025-10-14",
+          "params": {
+            "train_days": 120,
+            "retrain_interval": 20,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": -0.16,
+          "oos_sharpe": 2.0,
+          "is_ret": -1.98,
+          "oos_ret": 19.8
+        },
+        {
+          "win": 3,
+          "train": "2024-07-11~2025-10-14",
+          "test": "2025-10-15~2026-04-13",
+          "params": {
+            "train_days": 180,
+            "retrain_interval": 40,
+            "buy_th": 0.55,
+            "sell_th": 0.45
+          },
+          "is_sharpe": 0.98,
+          "oos_sharpe": 0.88,
+          "is_ret": 19.56,
+          "oos_ret": 7.52
+        }
+      ],
+      "elapsed_sec": 23.5,
+      "strategy": "ml_prob"
+    }
+  ]
+}

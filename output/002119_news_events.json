@@ -1,0 +1,170 @@
+{
+  "summary": {
+    "total_news": 10,
+    "events_detected": 10,
+    "bullish_events": 7,
+    "bearish_events": 3,
+    "policy_events": 0
+  },
+  "events": [
+    {
+      "news_index": 0,
+      "news_preview": "7月30日，康强电子（002119）发布公告，截至2026年7月29日，公司已回购402万股，占总股本的1.07%，回购总金额为8752万元，回购价格区间在20.17元/股至22.71元/股。 2026年一季度，康强电子实现收入6.56亿元，归母净利润2547万元。 康强电子已回购402万股，金额达",
+      "detection_method": "keyword",
+      "event_type": "利好",
+      "event_category": "回购增持",
+      "matched_keywords": [
+        "回购"
+      ],
+      "signal": "看多",
+      "signal_reason": "大股东/公司用真金白银表达信心"
+    },
+    {
+      "news_index": 1,
+      "news_preview": "39002.63 汽车 002552 宝鼎科技 39.34 5.00 980.23 38562.25 电子 688596 正帆科技 57.42 12.01 616.74 35413.33 机械设备 000603 盛达资源 29.15 7.42 1196.29 34871.74 有色金属 002119",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "股票涨停",
+      "event_description": "多只股票在上午收盘时涨停。",
+      "related_stocks": [
+        "002552",
+        "688596",
+        "000603"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 股票涨停"
+    },
+    {
+      "news_index": 2,
+      "news_preview": "中京电子 10.00 8.00 14861.29 25.00 688432 有研硅 17.62 6.71 14551.93 5.51 002407 多氟多 4.62 16.93 11997.79 2.04 603773 沃格光电 10.00 4.56 11636.89 14.76 002119 存储",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "行业概念上涨",
+      "event_description": "存储芯片概念上涨6.17%，51股主力资金净流入超亿元。",
+      "related_stocks": [
+        "中京电子",
+        "有研硅",
+        "多氟多",
+        "沃格光电",
+        "002119"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 行业概念上涨"
+    },
+    {
+      "news_index": 3,
+      "news_preview": "7.55 10.20 12052.41 6.40 603928 兴业股份 10.05 10.03 11983.42 30.01 603773 沃格光电 10.00 4.56 11636.89 14.76 688456 有研粉材 12.28 9.99 11528.98 14.53 002119 先进封",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "主力资金净流入",
+      "event_description": "多只股票出现主力资金净流入超亿元的情况，表明市场对相关股票的看好。",
+      "related_stocks": [
+        "603928",
+        "603773",
+        "688456",
+        "002119"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 主力资金净流入"
+    },
+    {
+      "news_index": 4,
+      "news_preview": "7月23日，康强电子（002119）发布公告，截至公告披露日，公司首次回购股份244万股，占总股本的0.65%，回购价格区间为21.56元/股至22.6元/股，成交总金额为5351万元。 2026年一季度，康强电子实现收入6.56亿元，归母净利润2547万元。 康强电子首次回购244万股 金额535",
+      "detection_method": "keyword",
+      "event_type": "利好",
+      "event_category": "回购增持",
+      "matched_keywords": [
+        "回购"
+      ],
+      "signal": "看多",
+      "signal_reason": "大股东/公司用真金白银表达信心"
+    },
+    {
+      "news_index": 5,
+      "news_preview": "中证智能财讯康强电子（002119）7月24日公告，截至2026年7月23日，公司以集中竞价交易方式首次回购股份243.77万股，占公司总股本的0.65%，最高成交价为22.60元/股，最低成交价为21.56元/股，成交总金额5351.36万元。 康强电子：首次回购股份243.77万股 成交总金额5",
+      "detection_method": "keyword",
+      "event_type": "利好",
+      "event_category": "回购增持",
+      "matched_keywords": [
+        "回购"
+      ],
+      "signal": "看多",
+      "signal_reason": "大股东/公司用真金白银表达信心"
+    },
+    {
+      "news_index": 6,
+      "news_preview": "-10252.89 688362 甬矽电子 -10.95 6.87 -10172.72 002281 光迅科技 -3.09 3.93 -8998.43 001399 惠科股份 -0.97 6.63 -8311.78 300398 飞凯材料 -4.73 6.11 -8269.25 002119 先进封",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利空",
+      "event_category": "主力资金净流出",
+      "event_description": "多只股票主力资金净流出超亿元，显示市场资金撤离。",
+      "related_stocks": [
+        "688362",
+        "002281",
+        "001399",
+        "300398"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "回避",
+      "signal_reason": "利空事件 - 主力资金净流出"
+    },
+    {
+      "news_index": 7,
+      "news_preview": "10.00 -10084.61 688627 精智达 -9.67 5.29 -9688.91 603650 彤程新材 -6.31 3.27 -8864.23 300975 商络电子 -3.40 8.96 -8721.72 300398 飞凯材料 -4.73 6.11 -8269.25 002119 ",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利空",
+      "event_category": "主力资金净流出",
+      "event_description": "存储芯片概念下跌，主力资金净流出134股。",
+      "related_stocks": [
+        "688627",
+        "603650",
+        "300975",
+        "300398"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "回避",
+      "signal_reason": "利空事件 - 主力资金净流出"
+    },
+    {
+      "news_index": 8,
+      "news_preview": "5.77 -2027.26 600605 汇通能源 -9.28 3.20 -2020.93 301629 矽电股份 -8.76 6.06 -2016.99 002559 亚威股份 -4.60 6.16 -2011.13 002055 ST得润 -4.34 2.54 -1942.25 002119 存",
+      "detection_method": "keyword",
+      "event_type": "利空",
+      "event_category": "退市风险",
+      "matched_keywords": [
+        "ST"
+      ],
+      "signal": "强烈回避",
+      "signal_reason": "退市风险极高"
+    },
+    {
+      "news_index": 9,
+      "news_preview": "3.04 2.46 -5773.82 -10.25 600900 长江电力 -0.14 0.42 -5846.76 -1.98 688268 华特气体 -4.22 5.40 -7388.53 -8.62 600353 旭光电子 -4.79 5.37 -7885.98 -8.32 002119 26.",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "主力资金流入",
+      "event_description": "核电概念股票受到主力资金关注，出现资金净流入。",
+      "related_stocks": [
+        "002119"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 主力资金流入"
+    }
+  ]
+}

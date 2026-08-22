@@ -1,0 +1,4 @@
+# 实盘初始持仓配置 (手动维护或从 miniQMT 同步)
+# 注意: 与模拟盘 mock_positions.yaml 完全独立
+capital: 1000000
+positions: []

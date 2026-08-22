@@ -1,0 +1,21 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 6,
+  "negative_count": 0,
+  "neutral_count": 4,
+  "top_themes": [
+    "AI应用端",
+    "核电板块",
+    "融资客买入"
+  ],
+  "risk_alerts": [
+    "市场交投清淡可能影响流动性",
+    "部分个股突破半年线后可能面临回调压力"
+  ],
+  "opportunity_hints": [
+    "关注AI和核电板块的持续活跃性",
+    "留意融资客买入的个股动向"
+  ],
+  "summary": "整体市场情绪积极，AI和核电板块表现活跃，融资客积极买入。"
+}

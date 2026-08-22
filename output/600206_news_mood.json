@@ -1,0 +1,20 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 8,
+  "negative_count": 1,
+  "neutral_count": 2,
+  "top_themes": [
+    "有研新材的业绩增长",
+    "有研新材的分红计划",
+    "有研新材的扩产项目"
+  ],
+  "risk_alerts": [
+    "股价异常波动可能引发监管关注"
+  ],
+  "opportunity_hints": [
+    "关注有研新材的业绩增长和分红潜力",
+    "留意其扩产项目的市场表现"
+  ],
+  "summary": "整体市场情绪偏乐观，主要受业绩增长和分红计划推动，但需关注股价波动风险。"
+}

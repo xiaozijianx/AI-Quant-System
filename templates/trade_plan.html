@@ -1,0 +1,856 @@
+{% extends "base.html" %}
+{% block title %}交易计划 -- AI 量化系统{% endblock %}
+
+{% block echarts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="tradePlanApp()" x-init="init()">
+
+    <!-- 顶部标题栏 -->
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+            <div>
+                <h1 class="text-lg font-bold text-gray-900">
+                    <span x-text="code"></span>
+                    <span x-show="displayName()" class="ml-2 text-gray-700" x-text="displayName()"></span>
+                    <span x-show="!displayName()" class="ml-2 text-gray-400 text-sm font-normal">(未知名称)</span>
+                </h1>
+                <div class="text-xs text-gray-500">
+                    <span x-text="planType === 'live' ? '实盘' : '模拟盘'"></span>
+                    · <span x-text="tradeDate"></span>
+                </div>
+                <div class="text-xs text-gray-600 mt-1">
+                    持仓 <span class="font-mono" x-text="parsed.position_plan?.current?.volume || 0"></span> 股
+                    · 成本 <span class="font-mono" x-text="currentCostText()"></span>
+                    · 现价 <span class="font-mono" x-text="quote.close ? '¥' + quote.close.toFixed(2) : '—'"></span>
+                    <span :class="quote.change_pct >= 0 ? 'text-red-600' : 'text-green-600'"
+                          x-text="quote.change_pct ? (quote.change_pct >= 0 ? '+' : '') + quote.change_pct.toFixed(2) + '%' : ''"></span>
+                </div>
+            </div>
+            <template x-if="exists">
+                <span class="badge"
+                      :class="metadata.is_active ? 'badge-success' : 'badge-gray'"
+                      x-text="metadata.is_active ? '生效' : '未生效'"></span>
+            </template>
+        </div>
+        <div class="flex items-center gap-2">
+            <a :href="'/live/' + (planType === 'live' ? 'real' : 'sim')" class="btn btn-secondary btn-sm">返回监控</a>
+            <template x-if="exists && !editing">
+                <button type="button" class="btn btn-primary btn-sm" @click="editing = true">编辑</button>
+            </template>
+            <template x-if="exists && !editing && !isPlanComplete()">
+                <button type="button" class="btn btn-warning btn-sm" :disabled="generating" @click="generatePlan(true)"
+                        title="旧计划缺少部分章节, 重新生成会覆盖现有内容">
+                    <span x-show="!generating">重新生成</span>
+                    <span x-show="generating">生成中...</span>
+                </button>
+            </template>
+            <template x-if="editing">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="saving" @click="savePlan()">
+                    <span x-show="!saving">保存</span>
+                    <span x-show="saving">保存中...</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" :disabled="saving" @click="cancelEdit()">取消</button>
+            </template>
+        </div>
+    </div>
+
+    <!-- 两栏布局 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- 左栏: 监控列表 -->
+        <div class="lg:col-span-3 space-y-3">
+            <div class="card">
+                <div class="card-header" style="padding-bottom:0.5rem;">
+                    <div class="card-title" style="font-size:13px;">监控列表</div>
+                    <span class="text-xs text-gray-400" x-text="watchList.length + ' 只'"></span>
+                </div>
+                <!-- sim / live 切换 -->
+                <div class="flex items-center gap-1 px-3 pb-2 mb-1 border-b border-gray-100">
+                    <button type="button"
+                            class="flex-1 text-xs py-1 px-2 rounded"
+                            :class="planType === 'sim' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                            @click="switchPlanType('sim')">模拟盘</button>
+                    <button type="button"
+                            class="flex-1 text-xs py-1 px-2 rounded"
+                            :class="planType === 'live' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                            @click="switchPlanType('live')">实盘</button>
+                </div>
+                <div class="space-y-0.5" style="max-height:660px;overflow-y:auto;">
+                    <template x-if="watchList.length === 0">
+                        <div class="text-gray-400 text-xs py-3 text-center">(暂无监控标的)</div>
+                    </template>
+                    <template x-for="item in watchList" :key="item.code">
+                        <a :href="'/trade-plan/' + item.code + '?plan_type=' + planType"
+                           class="flex items-center justify-between px-2 py-1.5 rounded text-xs no-underline"
+                           :class="item.code === code ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50'">
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="font-mono shrink-0" x-text="item.code"></span>
+                                <span class="truncate text-gray-500" x-text="item.name || '未知名称'"></span>
+                            </div>
+                            <span class="shrink-0 w-2 h-2 rounded-full"
+                                  :class="planIndex[item.code] ? 'bg-green-500' : 'bg-gray-200'"
+                                  :title="planIndex[item.code] ? '已有交易计划' : '无交易计划'"></span>
+                        </a>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中栏: 交易计划内容 -->
+        <div class="lg:col-span-9 space-y-3">
+            <div class="card">
+                <!-- 卡片头部: 当前标的 + 状态开关 -->
+                <div class="card-header">
+                    <div class="flex items-center gap-2">
+                        <div class="text-base font-semibold text-gray-900" x-text="displayName()"></div>
+                        <code class="text-xs text-gray-500" x-text="code"></code>
+                    </div>
+                    <template x-if="exists">
+                        <div class="flex flex-col items-end gap-1">
+                            <div class="flex items-center gap-3">
+                                <label class="flex items-center gap-1.5 text-xs cursor-pointer" title="计划总开关：勾选后引擎才会按条件自动执行">
+                                    <input type="checkbox" class="form-checkbox" :checked="metadata.is_active" @change="onToggleActive($event.target.checked)">
+                                    <span>生效</span>
+                                </label>
+                            </div>
+                            <div class="text-[10px] text-gray-400">
+                                生效 = 计划启用且由引擎按条件自动执行
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- 空状态: 未选择监控标的 -->
+                <div x-show="!code" class="py-12 text-center space-y-3">
+                    <div class="text-gray-400 text-sm">暂未选择监控标的</div>
+                    <a href="/live/sim" class="btn btn-primary btn-sm">去实盘监控添加</a>
+                </div>
+
+                <!-- 编辑模式: Markdown 编辑器 -->
+                <template x-if="editing && code">
+                    <div class="space-y-2">
+                        <textarea class="form-textarea w-full font-mono text-sm"
+                                  style="min-height:520px;resize:vertical;"
+                                  x-model="markdown"
+                                  placeholder="在此编辑交易计划 Markdown..."></textarea>
+                        <div class="text-xs text-gray-500 flex justify-between">
+                            <span>支持 YAML frontmatter、# 一级章节、## 二级子章节、### 条件条目</span>
+                            <span x-text="markdown.length + ' 字'"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 预览模式: 未生成计划 -->
+                <template x-if="!editing && !exists">
+                    <div class="py-12 text-center space-y-3">
+                        <div class="text-gray-400 text-sm">该股票暂无交易计划</div>
+                        <button type="button" class="btn btn-primary" :disabled="generating" @click="generatePlan()">
+                            <span x-show="!generating">生成交易计划</span>
+                            <span x-show="generating">生成中...</span>
+                        </button>
+                    </div>
+                </template>
+
+                <!-- 预览模式: 已生成计划 -->
+                <template x-if="!editing && exists">
+                    <div class="space-y-6">
+                        <!-- 当前操作建议 -->
+                        <div x-show="sections['当前操作建议']">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">1</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900">当前操作建议</div>
+                                    <div class="text-xs text-gray-400">现在该怎么办</div>
+                                </div>
+                            </div>
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                                <div class="flex flex-wrap gap-2 mb-2">
+                                    <template x-if="parsed.current_opinion?.action">
+                                        <span class="inline-block bg-indigo-600 text-white text-xs font-medium px-2 py-0.5 rounded"
+                                              x-text="parsed.current_opinion.action"></span>
+                                    </template>
+                                    <template x-if="parsed.current_opinion?.conclusion">
+                                        <span class="inline-block bg-indigo-200 text-indigo-900 text-xs font-medium px-2 py-0.5 rounded"
+                                              x-text="parsed.current_opinion.conclusion"></span>
+                                    </template>
+                                </div>
+                                <div class="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap"
+                                     x-text="parsed.current_opinion?.detail || '（空）'"></div>
+                            </div>
+                        </div>
+
+                        <!-- 仓位计划 -->
+                        <div x-show="sections['仓位计划']">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">2</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900">仓位计划</div>
+                                    <div class="text-xs text-gray-400">我的仓位 / 接下来做什么</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <div class="text-xs text-gray-500 mb-1">当前持仓</div>
+                                    <div class="text-xl font-bold font-mono text-gray-900"
+                                         x-text="((parsed.position_plan?.current?.ratio || 0) * 100).toFixed(2) + '%'"></div>
+                                    <div class="text-xs text-gray-600 mt-1"
+                                         x-text="(parsed.position_plan?.current?.volume || 0) + ' 股 · ¥' + App.fmtNum(parsed.position_plan?.current?.value || 0, 0)"></div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <div class="text-xs text-gray-500 mb-1">目标占比</div>
+                                    <div class="text-xl font-bold font-mono text-gray-900"
+                                         x-text="((parsed.position_plan?.target?.min || 0) * 100).toFixed(0) + '-' + ((parsed.position_plan?.target?.max || 0) * 100).toFixed(0) + '%'"></div>
+                                    <div class="text-xs text-gray-600 mt-1"
+                                         x-text="'¥' + App.fmtNum((parsed.position_plan?.target?.min || 0) * totalCapital, 0) + ' - ¥' + App.fmtNum((parsed.position_plan?.target?.max || 0) * totalCapital, 0)"></div>
+                                    <div class="text-xs text-indigo-600 mt-1"
+                                         x-show="parsed.position_plan?.target?.advice"
+                                         x-text="'AI 建议：' + parsed.position_plan.target.advice"></div>
+                                </div>
+                                <div class="bg-emerald-50 rounded-lg p-3">
+                                    <div class="text-xs text-emerald-700 mb-1">入场条件</div>
+                                    <template x-if="(parsed.entry_conditions || []).length > 0">
+                                        <div class="space-y-1">
+                                            <template x-for="(cond, i) in (parsed.entry_conditions || [])" :key="'pos-entry-' + i">
+                                                <div class="text-xs">
+                                                    <div class="font-medium text-emerald-900" x-text="cond.title"></div>
+                                                    <div class="text-emerald-700" x-text="formatTriggerAndAction(cond)"></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="(parsed.entry_conditions || []).length === 0">
+                                        <div class="text-xs text-gray-500">当前已持仓 / 目标仓位已满足，暂不入場</div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 入场计划 -->
+                        <div x-show="sections['入场计划']">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">3</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900">入场计划</div>
+                                    <div class="text-xs text-gray-400">什么情况下买 / 买回</div>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <template x-for="(cond, i) in (parsed.entry_conditions || [])" :key="'entry-' + i">
+                                    <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 text-xs">
+                                        <div class="font-medium text-emerald-900 mb-1" x-text="cond.title"></div>
+                                        <div class="text-emerald-800 mb-1" x-text="formatTriggerAndAction(cond)"></div>
+                                        <div class="text-emerald-600 leading-relaxed"
+                                             x-show="cond.description" x-text="cond.description"></div>
+                                    </div>
+                                </template>
+                                <template x-if="(parsed.entry_conditions || []).length === 0">
+                                    <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap"
+                                         x-text="sections['入场计划'] || '（空）'"></div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- 出场计划 -->
+                        <div x-show="sections['出场计划']">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">4</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900">出场计划</div>
+                                    <div class="text-xs text-gray-400">什么情况下卖</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <!-- 止盈 -->
+                                <div x-show="(parsed.exit_plan?.take_profit || []).length > 0">
+                                    <div class="flex items-center gap-1.5 mb-2">
+                                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                        <span class="text-sm font-medium text-green-700">止盈 (<span x-text="(parsed.exit_plan?.take_profit || []).length"></span>)</span>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <template x-for="(cond, i) in (parsed.exit_plan?.take_profit || [])" :key="'tp-' + i">
+                                            <div class="bg-green-50 border border-green-100 rounded-lg p-2.5 text-xs">
+                                                <div class="font-medium text-green-900 mb-1" x-text="cond.title"></div>
+                                                <div class="text-green-800 mb-1" x-text="formatTriggerAndAction(cond)"></div>
+                                                <div class="text-green-600 leading-relaxed"
+                                                     x-show="cond.description" x-text="cond.description"></div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <!-- 止损 -->
+                                <div x-show="(parsed.exit_plan?.stop_loss || []).length > 0">
+                                    <div class="flex items-center gap-1.5 mb-2">
+                                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                        <span class="text-sm font-medium text-red-700">止损 (<span x-text="(parsed.exit_plan?.stop_loss || []).length"></span>)</span>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <template x-for="(cond, i) in (parsed.exit_plan?.stop_loss || [])" :key="'sl-' + i">
+                                            <div class="bg-red-50 border border-red-100 rounded-lg p-2.5 text-xs">
+                                                <div class="font-medium text-red-900 mb-1" x-text="cond.title"></div>
+                                                <div class="text-red-800 mb-1" x-text="formatTriggerAndAction(cond)"></div>
+                                                <div class="text-red-600 leading-relaxed"
+                                                     x-show="cond.description" x-text="cond.description"></div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 加仓计划 -->
+                        <div x-show="sections['加仓计划']">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">5</div>
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900">加仓计划</div>
+                                    <div class="text-xs text-gray-400">什么情况下补 / 追</div>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <template x-for="(cond, i) in (parsed.add_position_conditions || [])" :key="'add-' + i">
+                                    <div class="bg-blue-50 border border-blue-100 rounded-lg p-2.5 text-xs">
+                                        <div class="font-medium text-blue-900 mb-1" x-text="cond.title"></div>
+                                        <div class="text-blue-800 mb-1" x-text="formatTriggerAndAction(cond)"></div>
+                                        <div class="text-blue-600 leading-relaxed"
+                                             x-show="cond.description" x-text="cond.description"></div>
+                                    </div>
+                                </template>
+                                <template x-if="(parsed.add_position_conditions || []).length === 0">
+                                    <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap"
+                                         x-text="sections['加仓计划'] || '（空）'"></div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- 判断逻辑 -->
+                        <div x-show="sections['判断逻辑']">
+                            <details class="group">
+                                <summary class="flex items-center gap-2 cursor-pointer list-none">
+                                    <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">6</div>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-semibold text-gray-900">判断逻辑</div>
+                                        <div class="text-xs text-gray-400">为什么是这个方案（点击展开）</div>
+                                    </div>
+                                    <span class="text-gray-400 text-xs group-open:rotate-180 transition-transform">▼</span>
+                                </summary>
+                                <div class="mt-2 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap pl-8"
+                                     x-text="sections['判断逻辑'] || '（空）'"></div>
+                            </details>
+                        </div>
+
+                        <!-- K线 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">7</div>
+                                    <div>
+                                        <div class="text-sm font-semibold text-gray-900">K线（60日 + MA + 触发线）</div>
+                                        <div class="text-xs text-gray-400">点击折叠图表</div>
+                                    </div>
+                                </div>
+                                <a :href="'/stock-quote?code=' + encodeURIComponent(code)" class="text-xs text-indigo-600 hover:underline">查看完整 K线 →</a>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-lg p-2">
+                                <div id="plan-kline-chart" style="width:100%;height:360px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 风控说明 -->
+                        <div x-show="sections['风控说明']">
+                            <div class="text-xs font-semibold text-gray-700 mb-1.5">风控说明</div>
+                            <div class="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap"
+                                 x-text="sections['风控说明'] || '（空）'"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ECharts 实例不放入 Alpine 响应式对象, 避免 Proxy 破坏其内部状态
+let klineChart = null;
+
+function tradePlanApp() {
+    return {
+        code: '{{ code }}',
+        planType: '{{ plan_type }}',
+        tradeDate: '{{ trade_date }}',
+        markdown: '',
+        metadata: {},
+        parsed: {
+            current_opinion: { conclusion: '', detail: '' },
+            position_plan: { current: {}, target: {} },
+            exit_plan: { take_profit: [], stop_loss: [] },
+            add_position_conditions: [],
+            entry_conditions: []
+        },
+        sections: {},
+        exists: false,
+        editing: false,
+        saving: false,
+        generating: false,
+        watchList: [],
+        planIndex: {},
+        quote: {},
+        klineData: null,
+        totalCapital: 1000000,
+
+        async init() {
+            await this.loadWatchList();
+            await this.loadPlanIndex();
+            if (!this.code) return;
+            await this.loadPlan();
+            await this.loadQuote();
+            await this.loadKline();
+        },
+
+        switchPlanType(pt) {
+            if (pt === this.planType) return;
+            // 切换后刷新 URL, 保持当前 code
+            if (this.code) {
+                window.location.href = '/trade-plan/' + encodeURIComponent(this.code) + '?plan_type=' + pt;
+            } else {
+                window.location.href = '/trade-plan?plan_type=' + pt;
+            }
+        },
+
+        async loadPlan() {
+            if (!this.code) {
+                this.exists = false;
+                return;
+            }
+            try {
+                const r = await App.get('/api/trade-plan/' + encodeURIComponent(this.code)
+                                        + '?plan_type=' + this.planType + '&trade_date=' + this.tradeDate);
+                if (r && r.ok && r.exists) {
+                    this.markdown = r.raw_markdown || '';
+                    this.metadata = r.metadata || {};
+                    this.parsed = r.parsed || this.parsed;
+                    this.sections = (r.parsed && r.parsed.sections) || {};
+                    this.exists = true;
+                    this.editing = false;
+                } else {
+                    this.exists = false;
+                    this.editing = false;
+                    this.markdown = '';
+                    this.metadata = {};
+                    this.parsed = { current_opinion: { conclusion: '', detail: '' }, position_plan: { current: {}, target: {} }, exit_plan: { take_profit: [], stop_loss: [] }, add_position_conditions: [], entry_conditions: [] };
+                    this.sections = {};
+                }
+            } catch (e) {
+                console.error('loadPlan', e);
+                App.toast('加载计划失败: ' + (e && e.message ? e.message : String(e)), 'warn');
+                this.exists = false;
+            }
+        },
+
+        async generatePlan(force = false) {
+            this.generating = true;
+            try {
+                const r = await App.post('/api/trade-plan/' + encodeURIComponent(this.code)
+                                         + '/generate?plan_type=' + this.planType + '&trade_date=' + this.tradeDate,
+                                         force ? { force: true } : {});
+                if (r && r.ok && r.exists) {
+                    App.toast(force ? '已重新生成交易计划' : '已生成默认交易计划', 'success');
+                    this.markdown = r.raw_markdown || '';
+                    this.metadata = r.metadata || {};
+                    this.parsed = r.parsed || this.parsed;
+                    this.sections = (r.parsed && r.parsed.sections) || {};
+                    this.exists = true;
+                    this.editing = false;
+                    await this.loadPlanIndex();
+                } else {
+                    App.toast('生成失败: ' + ((r && r.message) || '未知错误'), 'danger');
+                }
+            } catch (e) {
+                console.error(e);
+                App.toast('请求失败: ' + (e && e.message ? e.message : String(e)), 'danger');
+            } finally {
+                this.generating = false;
+            }
+        },
+
+        isPlanComplete() {
+            const required = ['当前操作建议', '仓位计划', '出场计划', '判断逻辑', '风控说明'];
+            return required.every(s => this.sections[s] && this.sections[s].trim());
+        },
+
+        async savePlan() {
+            this.saving = true;
+            try {
+                const r = await App.post('/api/trade-plan/' + encodeURIComponent(this.code)
+                                         + '?plan_type=' + this.planType + '&trade_date=' + this.tradeDate, {
+                    markdown: this.markdown
+                });
+                if (r && r.ok) {
+                    App.toast('已保存', 'success');
+                    this.metadata = (r.parsed && r.parsed.metadata) || this.metadata;
+                    this.parsed = r.parsed || this.parsed;
+                    this.sections = (r.parsed && r.parsed.sections) || {};
+                    this.exists = true;
+                    this.editing = false;
+                    await this.loadPlanIndex();
+                } else {
+                    App.toast('保存失败: ' + ((r && r.message) || '未知错误'), 'danger');
+                }
+            } catch (e) {
+                console.error(e);
+                App.toast('请求失败: ' + (e && e.message ? e.message : String(e)), 'danger');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        cancelEdit() {
+            this.editing = false;
+            // 重新加载, 丢弃未保存的编辑
+            this.loadPlan();
+        },
+
+        /** 切换「生效」: 生效即自动执行, 后端联动打开 is_auto_trade */
+        async onToggleActive(value) {
+            await this.toggle('is_active', value);
+        },
+
+        async toggle(field, value) {
+            try {
+                const r = await App.post('/api/trade-plan/' + encodeURIComponent(this.code)
+                                         + '/toggle?plan_type=' + this.planType + '&trade_date=' + this.tradeDate, {
+                    field: field,
+                    value: value
+                });
+                if (r && r.ok) {
+                    App.toast('已更新', 'success');
+                    this.metadata[field] = value;
+                    await this.loadPlanIndex();
+                } else {
+                    App.toast('更新失败: ' + ((r && r.message) || '未知错误'), 'danger');
+                    await this.loadPlan();
+                }
+            } catch (e) {
+                console.error(e);
+                App.toast('请求失败: ' + (e && e.message ? e.message : String(e)), 'danger');
+                await this.loadPlan();
+            }
+        },
+
+        async loadWatchList() {
+            try {
+                // sim/real 独立: planType='live' 时读取实盘 watch_merge
+                const url = this.planType === 'live' ? '/api/live/real/watch_merge?ui=' : '/api/live/watch_merge?ui=';
+                const r = await App.get(url);
+                let merged = (r && r.merged) || [];
+                // 实盘: 监控列表 = 自选池 + 待入场 + QMT 实时持仓
+                // (watch_merge 的持仓来自 live_state_real.json, 这里再并入 QMT 账户真实持仓;
+                //   QMT 未连接时忽略, 不影响自选池/待入场的展示)
+                if (this.planType === 'live') {
+                    try {
+                        const acct = await App.get('/api/live/real_account');
+                        const posCodes = ((acct && acct.positions) || [])
+                            .map(p => this.normCode(p.stock_code))
+                            .filter(c => c);
+                        merged = [...new Set([...merged, ...posCodes])];
+                    } catch (e2) { /* QMT 不可用时忽略持仓并入 */ }
+                }
+                const names = await this.loadStockNames(merged);
+                this.watchList = merged.map(c => ({ code: c, name: names[c] || '' }));
+            } catch (e) {
+                console.error('loadWatchList', e);
+                this.watchList = [];
+            }
+        },
+
+        async loadStockNames(codes) {
+            if (!codes || codes.length === 0) return {};
+            try {
+                const r = await App.get('/api/live/stock_names?codes=' + encodeURIComponent(codes.join(',')));
+                return (r && r.names) || {};
+            } catch (e) {
+                console.error('loadStockNames', e);
+                return {};
+            }
+        },
+
+        async loadQuote() {
+            try {
+                const r = await App.get('/api/live/watch_quotes?codes=' + encodeURIComponent(this.code));
+                this.quote = (r && r.quotes && r.quotes[this.code]) || {};
+            } catch (e) {
+                console.error('loadQuote', e);
+                this.quote = {};
+            }
+        },
+
+        async loadKline() {
+            if (!this.code) return;
+            try {
+                const qs = new URLSearchParams({ code: this.code, timeframe: 'daily', years: '1' });
+                const r = await App.get('/api/stock-quote/quote?' + qs.toString());
+                if (r && r.ok) {
+                    this.klineData = r;
+                    this.$nextTick(() => this.renderKline());
+                } else {
+                    this.klineData = null;
+                }
+            } catch (e) {
+                console.error('loadKline', e);
+                this.klineData = null;
+            }
+        },
+
+        renderKline() {
+            const el = document.getElementById('plan-kline-chart');
+            if (!el || !this.klineData) return;
+            const dates = this.klineData.dates || [];
+            const ohlc = this.klineData.ohlc || [];
+            if (!dates.length || !ohlc.length) return;
+
+            if (!klineChart) {
+                klineChart = echarts.init(el);
+                // 自定义滚轮缩放: 以右边界为锚点, 放大时左边界左移, 缩小时左边界右移
+                // (与个股详情页 K 线一致: 缩放时右侧时间不变, 左侧时间变化)
+                klineChart.getZr().on('mousewheel', (e) => {
+                    const event = e && e.event;
+                    if (!event) return;
+                    event.preventDefault && event.preventDefault();
+                    event.stopPropagation && event.stopPropagation();
+                    const delta = event.wheelDelta || -event.deltaY;
+                    if (!delta) return;
+                    const opt = klineChart.getOption();
+                    const dz = opt.dataZoom && opt.dataZoom[0];
+                    const xData = opt.xAxis && opt.xAxis[0] && opt.xAxis[0].data;
+                    if (!dz || !xData || !xData.length) return;
+                    let endValue = dz.endValue != null ? dz.endValue : xData.length - 1;
+                    let startValue = dz.startValue != null ? dz.startValue : 0;
+                    const currentCount = Math.max(1, endValue - startValue);
+                    const factor = delta > 0 ? 0.9 : 1.1; // 向上滚轮放大, 向下滚轮缩小
+                    const newCount = Math.max(10, Math.min(Math.round(currentCount * factor), xData.length - 1));
+                    const newStartValue = Math.max(0, endValue - newCount);
+                    klineChart.dispatchAction({ type: 'dataZoom', startValue: newStartValue, endValue: endValue });
+                });
+            }
+
+            // 收盘价序列, 用于计算 MA
+            const closes = ohlc.map(k => (k && k[1] != null) ? Number(k[1]) : null);
+            const sma = (arr, n) => arr.map((_, i) => {
+                if (i < n - 1) return null;
+                let sum = 0, cnt = 0;
+                for (let j = i - n + 1; j <= i; j++) {
+                    if (arr[j] != null) { sum += arr[j]; cnt++; }
+                }
+                return cnt > 0 ? sum / cnt : null;
+            });
+            const ma20 = sma(closes, 20);
+            const ma60 = sma(closes, 60);
+
+            // 默认展示最近 120 根日线, 与个股行情页保持一致
+            const total = dates.length;
+            const zoomStart = total > 120 ? Math.max(0, (1 - 120 / total) * 100) : 0;
+
+            // 收集触发价标注线
+            const markLines = [];
+            const addLine = (price, label, color) => {
+                if (price > 0) {
+                    markLines.push({
+                        yAxis: price,
+                        label: { formatter: label + ' ¥{c}', position: 'end', color: color, fontSize: 10 },
+                        lineStyle: { color: color, type: 'dashed', width: 1.5 }
+                    });
+                }
+            };
+            (this.parsed.entry_conditions || []).forEach(c => addLine(c.trigger_price, '入场', '#059669'));
+            (this.parsed.exit_plan?.take_profit || []).forEach(c => addLine(c.trigger_price, '止盈', '#16a34a'));
+            (this.parsed.exit_plan?.stop_loss || []).forEach(c => addLine(c.trigger_price, '止损', '#dc2626'));
+            (this.parsed.add_position_conditions || []).forEach(c => addLine(c.trigger_price, '加仓', '#4f46e5'));
+
+            const option = {
+                animation: false,
+                grid: { left: '10%', right: '10%', bottom: '15%', top: '10%' },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    formatter: (params) => {
+                        const idx = params[0].dataIndex;
+                        const d = dates[idx];
+                        const v = ohlc[idx];
+                        let html = `<div class="font-mono text-xs"><div class="font-bold mb-1">${d || '-'}</div>`;
+                        if (v && v[0] != null && v[1] != null && v[2] != null && v[3] != null) {
+                            const up = v[1] >= v[0];
+                            const color = up ? '#ef4444' : '#22c55e';
+                            html += `<div>开: <span style="color:${color}">${Number(v[0]).toFixed(2)}</span> 收: <span style="color:${color}">${Number(v[1]).toFixed(2)}</span> 低: ${Number(v[2]).toFixed(2)} 高: ${Number(v[3]).toFixed(2)}</div>`;
+                        }
+                        const parts = [];
+                        if (ma20[idx] != null) parts.push(`MA20: ${ma20[idx].toFixed(2)}`);
+                        if (ma60[idx] != null) parts.push(`MA60: ${ma60[idx].toFixed(2)}`);
+                        if (parts.length) html += `<div>${parts.join(' ')}</div>`;
+                        html += '</div>';
+                        return html;
+                    }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: dates,
+                    axisLine: { lineStyle: { color: '#9ca3af' } },
+                    axisLabel: { color: '#6b7280', fontSize: 10 }
+                },
+                yAxis: {
+                    scale: true,
+                    axisLine: { lineStyle: { color: '#9ca3af' } },
+                    splitLine: { lineStyle: { color: '#f3f4f6' } },
+                    axisLabel: { color: '#6b7280', fontSize: 10 }
+                },
+                dataZoom: [
+                    { type: 'inside', start: zoomStart, end: 100, zoomOnMouseWheel: false, moveOnMouseWheel: false },
+                    { type: 'slider', start: zoomStart, end: 100, bottom: 10 }
+                ],
+                series: [
+                    {
+                        type: 'candlestick',
+                        name: 'K线',
+                        data: ohlc,
+                        itemStyle: {
+                            color: '#ef4444',
+                            color0: '#22c55e',
+                            borderColor: '#ef4444',
+                            borderColor0: '#22c55e'
+                        },
+                        markLine: {
+                            symbol: 'none',
+                            data: markLines,
+                            animation: false
+                        }
+                    },
+                    {
+                        type: 'line',
+                        name: 'MA20',
+                        data: ma20,
+                        smooth: true,
+                        showSymbol: false,
+                        lineStyle: { color: '#f59e0b', width: 1 }
+                    },
+                    {
+                        type: 'line',
+                        name: 'MA60',
+                        data: ma60,
+                        smooth: true,
+                        showSymbol: false,
+                        lineStyle: { color: '#3b82f6', width: 1 }
+                    }
+                ]
+            };
+            klineChart.setOption(option, true);
+        },
+
+        currentCostText() {
+            const cur = this.parsed.position_plan && this.parsed.position_plan.current;
+            if (!cur || !cur.value || !cur.volume) return '—';
+            return '¥' + (cur.value / cur.volume).toFixed(2);
+        },
+
+        nameForCode(code) {
+            const item = this.watchList.find(x => x.code === code);
+            return item ? item.name : '';
+        },
+
+        displayName() {
+            const n = this.metadata.stock_name;
+            if (n && n !== this.code) return n;
+            const watchName = this.nameForCode(this.code);
+            if (watchName && watchName !== this.code) return watchName;
+            return '';
+        },
+
+        formatTriggerAndAction(cond) {
+            if (!cond) return '';
+            const side = cond.side || 'sell';
+            const pct = cond.action_percent !== undefined ? Number(cond.action_percent) : 1.0;
+            let actionText;
+            if (side === 'buy') {
+                actionText = pct >= 0.999 ? '市价全仓买入' : '市价买入 ' + (pct * 100).toFixed(0) + '%';
+            } else {
+                actionText = pct >= 0.999 ? '市价卖出 100%' : '市价卖出 ' + (pct * 100).toFixed(0) + '%';
+            }
+            let triggerText = '';
+            if (cond.trigger_pct !== undefined && cond.trigger_pct !== 0) {
+                triggerText = cond.trigger_pct > 0
+                    ? '浮盈高于 ' + (cond.trigger_pct * 100).toFixed(1) + '%'
+                    : '浮亏低于 ' + (Math.abs(cond.trigger_pct) * 100).toFixed(1) + '%';
+            } else if (cond.trigger_price !== undefined && cond.trigger_price > 0) {
+                triggerText = '触发价 ¥' + Number(cond.trigger_price).toFixed(2);
+            } else {
+                triggerText = '条件触发';
+            }
+            return triggerText + ' → ' + actionText;
+        },
+
+        conditionTriggerDesc(cond) {
+            if (!cond) return '';
+            const parts = [];
+            if (cond.trigger_pct !== undefined && cond.trigger_pct !== 0) {
+                parts.push((cond.trigger_pct > 0 ? '浮盈 +' : '浮亏 ') + (cond.trigger_pct * 100).toFixed(0) + '%');
+            }
+            if (cond.trigger_price !== undefined && cond.trigger_price > 0) {
+                parts.push('触发价 ≈ ¥' + Number(cond.trigger_price).toFixed(2));
+            }
+            return parts.length ? parts.join(' · ') : '满足条件';
+        },
+
+        async loadPlanIndex() {
+            try {
+                const r = await App.get('/api/trade-plans?plan_type=' + this.planType);
+                const idx = {};
+                (r.items || []).forEach(p => { idx[p.stock_code] = p; });
+                this.planIndex = idx;
+            } catch (e) {
+                console.error('loadPlanIndex', e);
+                this.planIndex = {};
+            }
+        },
+
+        formatCondition(cond) {
+            const parts = [];
+            if (cond.trigger_price !== undefined && cond.trigger_price > 0) {
+                parts.push('触发价 ¥' + Number(cond.trigger_price).toFixed(2));
+            }
+            if (cond.trigger_pct !== undefined && cond.trigger_pct !== 0) {
+                parts.push('触发比例 ' + (cond.trigger_pct > 0 ? '+' : '') + (cond.trigger_pct * 100).toFixed(1) + '%');
+            }
+            if (cond.action_percent !== undefined) {
+                const pct = Number(cond.action_percent);
+                const side = cond.side || 'sell';
+                if (pct >= 0.999) {
+                    parts.push(side === 'buy' ? '买入' : '清仓');
+                } else {
+                    parts.push((side === 'buy' ? '买入 ' : '卖出 ') + (pct * 100).toFixed(0) + '%');
+                }
+            }
+            return parts.length ? parts.join(' · ') : '（未解析到数值）';
+        },
+
+        formatConditionDetail(cond) {
+            if (!cond || !cond.raw) return '';
+            return cond.raw;
+        },
+
+        normCode(code) {
+            if (!code) return code;
+            const c = String(code).trim();
+            if (c.includes('.')) return c;
+            if (/^\d{6}$/.test(c)) {
+                const first = c.charAt(0);
+                if (first === '6') return c + '.SH';
+                if (first === '0' || first === '2' || first === '3') return c + '.SZ';
+                if (first === '8' || first === '9') return c + '.BJ';
+            }
+            return c;
+        }
+    }
+}
+</script>
+{% endblock %}

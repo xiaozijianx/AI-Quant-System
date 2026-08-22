@@ -1,0 +1,23 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 4,
+  "negative_count": 4,
+  "neutral_count": 3,
+  "top_themes": [
+    "半导体板块走强",
+    "存储芯片概念上涨",
+    "市场活跃度提升"
+  ],
+  "risk_alerts": [
+    "多只个股短期均线出现死叉",
+    "主力资金净流出",
+    "股价下跌风险"
+  ],
+  "opportunity_hints": [
+    "关注半导体和存储芯片概念",
+    "留意市场活跃度变化",
+    "关注融资余额增幅超5%的公司"
+  ],
+  "summary": "市场情绪整体偏乐观，多板块走强，但需警惕部分个股的下跌风险。"
+}

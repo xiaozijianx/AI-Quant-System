@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+{% block title %}个股行情 -- AI 量化系统{% endblock %}
+
+{% block echarts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="stockQuoteApp()" x-init="init()">
+
+    <!-- 顶部标题栏：左侧标题 + 右侧搜索 -->
+    <div class="stock-quote-header">
+        <div class="stock-quote-title">
+            <span>个股行情</span>
+            <template x-if="quote && quote.info">
+                <span class="text-sm font-normal text-gray-500 ml-2">
+                    <b x-text="quote.info.name || quote.code"></b>
+                    <code class="text-xs ml-1" x-text="quote.code"></code>
+                </span>
+            </template>
+        </div>
+
+        <div class="stock-search-wrap">
+            <input type="text" class="form-input stock-search-input"
+                   placeholder="输入代码或名称 (如 600519 / 茅台)"
+                   x-model="searchQuery"
+                   @input.debounce.300ms="onSearchInput()"
+                   @keydown.enter="selectFirst()"
+                   @click.away="searchOpen = false">
+            <div class="stock-search-dropdown" x-show="searchOpen && searchResults.length" x-cloak>
+                <template x-for="r in searchResults" :key="r.code">
+                    <div class="stock-search-item" @click="selectStock(r)">
+                        <div class="flex-1">
+                            <span class="font-medium" x-text="r.name || r.code"></span>
+                            <code class="text-xs text-gray-400 ml-2" x-text="r.code"></code>
+                        </div>
+                        <div class="text-xs text-gray-400" x-show="r.sector_2" x-text="r.sector_2"></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-stock-quote">
+        <!-- 左侧：图表区 -->
+        <div class="flex-col">
+            <div class="card stock-chart-card">
+                <div class="card-header" x-show="quote && quote.info">
+                    <div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-lg font-bold" x-text="quote && quote.info ? (quote.info.name || quote.code) : ''"></span>
+                            <code class="text-xs text-gray-500" x-text="quote ? quote.code : ''"></code>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-0.5">
+                            <span x-text="quote && quote.info ? quote.info.sector_1 : ''"></span>
+                            <span x-show="quote && quote.info && quote.info.sector_1 && quote.info.sector_2"> / </span>
+                            <span x-text="quote && quote.info ? quote.info.sector_2 : ''"></span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1" x-show="quote && quote.info">
+                            <template x-if="quote.info.concepts && quote.info.concepts.length">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="concept in quote.info.concepts" :key="concept">
+                                        <span class="px-1.5 py-0.5 bg-gray-100 rounded text-[10px]" x-text="concept"></span>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="!quote.info.concepts || !quote.info.concepts.length">
+                                <span class="text-gray-400">暂无强相关概念</span>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="timeframe-group">
+                            <button class="timeframe-btn" :class="timeframe === 'daily' ? 'active' : ''" @click="switchTimeframe('daily')">日线</button>
+                            <button class="timeframe-btn" :class="timeframe === 'weekly' ? 'active' : ''" @click="switchTimeframe('weekly')">周线</button>
+                            <button class="timeframe-btn" :class="timeframe === 'monthly' ? 'active' : ''" @click="switchTimeframe('monthly')">月线</button>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold num" :class="quote && quote.info && quote.info.latest_change >= 0 ? 'pos' : 'neg'"
+                                 x-text="quote && quote.info ? App.fmtNum(quote.info.latest_close, 2) : '-'"></div>
+                            <div class="text-sm num" :class="quote && quote.info && quote.info.latest_change >= 0 ? 'pos' : 'neg'"
+                                 x-text="quote && quote.info ? App.fmtSign(quote.info.latest_change, 2) + ' (' + App.fmtSign(quote.info.latest_change_pct, 2, '%') + ')' : '-'"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="loadingQuote" class="py-12 text-center text-gray-400">
+                    <span class="qa-loader">加载行情中<span class="qa-loader-dots"><i></i><i></i><i></i></span></span>
+                </div>
+                <div x-show="!loadingQuote && quoteError" class="py-12 text-center text-red-500" x-text="quoteError"></div>
+                <div id="stock-kline-chart" class="stock-kline-chart" x-show="!loadingQuote && !quoteError"></div>
+            </div>
+        </div>
+
+        <!-- 右侧：信息面板 -->
+        <div class="flex-col stock-info-col">
+
+            <!-- 个股概览 -->
+            <div class="card">
+                <div class="card-header"><div class="card-title">个股概览</div></div>
+                <div x-show="!quote || !quote.info" class="text-xs text-gray-400 py-2">加载中...</div>
+                <div x-show="quote && quote.info" class="space-y-2 text-sm">
+                    <div class="flex justify-between"><span class="text-gray-500">最新价</span>
+                        <span class="num font-medium" :class="quote && quote.info && quote.info.latest_change >= 0 ? 'pos' : 'neg'"
+                              x-text="quote && quote.info ? App.fmtNum(quote.info.latest_close, 2) : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">涨跌幅</span>
+                        <span class="num font-medium" :class="quote && quote.info && quote.info.latest_change >= 0 ? 'pos' : 'neg'"
+                              x-text="quote && quote.info ? App.fmtSign(quote.info.latest_change_pct, 2, '%') : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">成交量</span>
+                        <span class="num" x-text="quote && quote.info && quote.info.latest_volume ? App.fmtNum(quote.info.latest_volume, 0) : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">成交额</span>
+                        <span class="num" x-text="quote && quote.info && quote.info.latest_amount ? App.fmtNum(quote.info.latest_amount, 0) : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">换手率</span>
+                        <span class="num" x-text="quote && quote.info && quote.info.latest_turnover_rate != null ? App.fmtNum(quote.info.latest_turnover_rate, 2) + '%' : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">总股本</span>
+                        <span class="num" x-text="quote && quote.info && quote.info.total_shares ? App.fmtNum(quote.info.total_shares, 0) : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">流通股本</span>
+                        <span class="num" x-text="quote && quote.info && quote.info.float_shares ? App.fmtNum(quote.info.float_shares, 0) : '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">上市日期</span>
+                        <span x-text="quote && quote.info && quote.info.list_date || '-'"></span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">数据区间</span>
+                        <span class="text-xs" x-text="(quote && quote.info && quote.info.start_date || '') + ' ~ ' + (quote && quote.info && quote.info.end_date || '')"></span></div>
+                </div>
+            </div>
+
+            <!-- 财务摘要 -->
+            <div class="card">
+                <div class="card-header"><div class="card-title">财务摘要</div></div>
+                <div x-show="loadingFinancial" class="text-xs text-gray-400 py-2">加载中...</div>
+                <div x-show="!loadingFinancial && financial.length === 0" class="text-xs text-gray-400 py-2">暂无数据</div>
+                <div x-show="!loadingFinancial && financial.length > 0" class="space-y-3 max-h-64 overflow-y-auto pr-1">
+                    <template x-for="item in financial" :key="item.report_date">
+                        <div class="text-xs border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                            <div class="font-medium text-gray-700 mb-1" x-text="item.report_date"></div>
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                                <div class="flex justify-between"><span class="text-gray-500">营收</span><span class="num" x-text="item.revenue != null ? App.fmtNum(item.revenue/1e8, 2) + '亿' : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">净利润</span><span class="num" x-text="item.net_profit != null ? App.fmtNum(item.net_profit/1e8, 2) + '亿' : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">EPS</span><span class="num" x-text="item.eps != null ? App.fmtNum(item.eps, 2) : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">ROE</span><span class="num" x-text="item.roe != null ? App.fmtNum(item.roe, 2) + '%' : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">毛利率</span><span class="num" x-text="item.gross_margin != null ? App.fmtNum(item.gross_margin, 2) + '%' : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">负债率</span><span class="num" x-text="item.debt_ratio != null ? App.fmtNum(item.debt_ratio, 2) + '%' : '-'"></span></div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- 研报预期 -->
+            <div class="card">
+                <div class="card-header"><div class="card-title">研报预期</div></div>
+                <div x-show="loadingConsensus" class="text-xs text-gray-400 py-2">加载中...</div>
+                <div x-show="!loadingConsensus && consensus.length === 0" class="text-xs text-gray-400 py-2">暂无数据</div>
+                <div x-show="!loadingConsensus && consensus.length > 0" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    <template x-for="item in consensus" :key="item.broker + (item.report_date || '')">
+                        <div class="text-xs border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-medium text-gray-700" x-text="item.broker || '-'"></span>
+                                <span class="text-gray-400" x-text="item.report_date || '-'"></span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                                <div class="flex justify-between"><span class="text-gray-500">评级</span><span x-text="item.rating || '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">目标价</span><span class="num" x-text="item.target_price != null ? App.fmtNum(item.target_price, 2) : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">当年EPS</span><span class="num" x-text="item.eps_forecast_current != null ? App.fmtNum(item.eps_forecast_current, 2) : '-'"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">次年EPS</span><span class="num" x-text="item.eps_forecast_next != null ? App.fmtNum(item.eps_forecast_next, 2) : '-'"></span></div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- 新闻舆情 -->
+            <div class="card">
+                <div class="card-header"><div class="card-title">新闻舆情</div></div>
+                <div x-show="loadingNews" class="text-xs text-gray-400 py-2">加载中...</div>
+                <div x-show="!loadingNews && news.length === 0" class="text-xs text-gray-400 py-2">暂无数据</div>
+                <div x-show="!loadingNews && news.length > 0" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    <template x-for="item in news" :key="item.id">
+                        <div class="text-xs border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                            <a :href="item.source_url || '#'" target="_blank" class="hover:text-indigo-600 leading-relaxed block"
+                               :title="item.summary" x-text="item.title"></a>
+                            <div class="flex justify-between mt-1">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                      :class="sentimentClass(item.sentiment)"
+                                      x-text="sentimentText(item.sentiment)"></span>
+                                <span class="text-gray-400" x-text="item.published_at ? item.published_at.slice(0, 10) : '-'"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+function stockQuoteApp() {
+    // ECharts 实例不放入 Alpine 响应式对象，避免 Proxy 破坏其内部状态（如 dataZoom 更新）
+    let chart = null;
+
+    return {
+        code: '{{ code|default('000001.SH') }}',
+        timeframe: 'daily',
+        years: 3,
+        searchQuery: '',
+        searchResults: [],
+        searchOpen: false,
+        loadingQuote: false,
+        quoteError: '',
+        quote: null,
+        loadingFinancial: false,
+        financial: [],
+        loadingNews: false,
+        news: [],
+        loadingConsensus: false,
+        consensus: [],
+
+        init() {
+            const params = new URLSearchParams(location.search);
+            this.code = params.get('code') || '000001.SH';
+            const tf = params.get('timeframe') || 'daily';
+            this.timeframe = ['daily', 'weekly', 'monthly'].includes(tf) ? tf : 'daily';
+            this.loadAll();
+            window.addEventListener('resize', () => {
+                if (chart) chart.resize();
+            });
+        },
+
+        async loadAll() {
+            this.loadingQuote = true;
+            this.loadingFinancial = true;
+            this.loadingNews = true;
+            this.loadingConsensus = true;
+            this.quoteError = '';
+
+            await Promise.all([
+                this.loadQuote(),
+                this.loadFinancial(),
+                this.loadNews(),
+                this.loadConsensus(),
+            ]);
+        },
+
+        async loadQuote() {
+            this.loadingQuote = true;
+            try {
+                const qs = new URLSearchParams({ code: this.code, timeframe: this.timeframe, years: String(this.years) });
+                const r = await App.get('/api/stock-quote/quote?' + qs.toString());
+                if (r.ok) {
+                    this.quote = r;
+                    this.quoteError = '';
+                    this.$nextTick(() => this.renderChart());
+                } else {
+                    this.quote = null;
+                    this.quoteError = r.message || '加载行情失败';
+                }
+            } catch (e) {
+                this.quote = null;
+                this.quoteError = '加载行情失败: ' + e.message;
+            } finally {
+                this.loadingQuote = false;
+            }
+        },
+
+        async loadFinancial() {
+            this.loadingFinancial = true;
+            try {
+                const r = await App.get('/api/stock-quote/financial?code=' + encodeURIComponent(this.code));
+                this.financial = (r.ok ? r.items : []);
+            } catch (e) {
+                this.financial = [];
+            } finally {
+                this.loadingFinancial = false;
+            }
+        },
+
+        async loadNews() {
+            this.loadingNews = true;
+            try {
+                const r = await App.get('/api/stock-quote/news?code=' + encodeURIComponent(this.code));
+                this.news = (r.ok ? r.items : []);
+            } catch (e) {
+                this.news = [];
+            } finally {
+                this.loadingNews = false;
+            }
+        },
+
+        async loadConsensus() {
+            this.loadingConsensus = true;
+            try {
+                const r = await App.get('/api/stock-quote/consensus?code=' + encodeURIComponent(this.code));
+                this.consensus = (r.ok ? r.items : []);
+            } catch (e) {
+                this.consensus = [];
+            } finally {
+                this.loadingConsensus = false;
+            }
+        },
+
+        async onSearchInput() {
+            const q = this.searchQuery.trim();
+            if (!q) {
+                this.searchResults = [];
+                this.searchOpen = false;
+                return;
+            }
+            try {
+                const r = await App.get('/api/stock-quote/search?q=' + encodeURIComponent(q));
+                this.searchResults = (r.ok ? r.results : []);
+                this.searchOpen = true;
+            } catch (e) {
+                this.searchResults = [];
+                this.searchOpen = false;
+            }
+        },
+
+        selectFirst() {
+            if (this.searchResults.length) {
+                this.selectStock(this.searchResults[0]);
+            }
+        },
+
+        selectStock(item) {
+            if (!item || !item.code) return;
+            this.code = item.code;
+            this.searchQuery = '';
+            this.searchResults = [];
+            this.searchOpen = false;
+            // 切股票时彻底释放旧图表实例，避免旧 K 线数据/尺寸状态残留
+            this.quote = null;
+            this.quoteError = '';
+            if (chart) {
+                chart.dispose();
+                chart = null;
+            }
+            const url = '/stock-quote?code=' + encodeURIComponent(this.code) + '&timeframe=' + this.timeframe;
+            history.replaceState(null, '', url);
+            this.loadAll();
+        },
+
+        switchTimeframe(tf) {
+            if (this.timeframe === tf) return;
+            if (!['daily', 'weekly', 'monthly'].includes(tf)) return;
+            this.timeframe = tf;
+            history.replaceState(null, '', '/stock-quote?code=' + encodeURIComponent(this.code) + '&timeframe=' + tf);
+            // 切周期时先清空图表，避免旧数据残留导致渲染异常
+            if (chart) {
+                chart.clear();
+            }
+            this.loadQuote();
+        },
+
+        sentimentClass(s) {
+            if (s === 'positive') return 'bg-red-100 text-red-700';
+            if (s === 'negative') return 'bg-green-100 text-green-700';
+            return 'bg-gray-100 text-gray-600';
+        },
+        sentimentText(s) {
+            if (s === 'positive') return '正面';
+            if (s === 'negative') return '负面';
+            return '中性';
+        },
+
+        renderChart(retry = 0) {
+            const el = document.getElementById('stock-kline-chart');
+            if (!el || !this.quote || !this.quote.dates) return;
+
+            // 确保容器已有实际尺寸；CSS 或布局未就绪时短暂延迟重试，避免 canvas 宽高为 0
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                if (retry < 10) {
+                    setTimeout(() => this.renderChart(retry + 1), 80);
+                }
+                return;
+            }
+
+            // 复用 chart 实例，避免 dispose/init 导致切换周期时偶发空白
+            if (!chart) {
+                chart = echarts.init(el);
+                // 自定义滚轮缩放：以右边界为锚点，放大时左边界左移，缩小时左边界右移
+                chart.getZr().on('mousewheel', (e) => {
+                    const event = e && e.event;
+                    if (!event) return;
+                    event.preventDefault && event.preventDefault();
+                    event.stopPropagation && event.stopPropagation();
+                    const delta = event.wheelDelta || -event.deltaY;
+                    if (!delta) return;
+                    const opt = chart.getOption();
+                    const dz = opt.dataZoom && opt.dataZoom[0];
+                    const xData = opt.xAxis && opt.xAxis[0] && opt.xAxis[0].data;
+                    if (!dz || !xData || !xData.length) return;
+                    let endValue = dz.endValue != null ? dz.endValue : xData.length - 1;
+                    let startValue = dz.startValue != null ? dz.startValue : 0;
+                    const currentCount = Math.max(1, endValue - startValue);
+                    const factor = delta > 0 ? 0.9 : 1.1; // 向上滚轮放大，向下滚轮缩小
+                    const newCount = Math.max(10, Math.min(Math.round(currentCount * factor), xData.length - 1));
+                    const newStartValue = Math.max(0, endValue - newCount);
+                    chart.dispatchAction({ type: 'dataZoom', startValue: newStartValue, endValue: endValue });
+                });
+            } else {
+                chart.clear();
+            }
+
+            const dates = this.quote.dates;
+            const ohlc = this.quote.ohlc || [];
+            const volume = this.quote.volume || [];
+            const amount = this.quote.amount || [];
+            const turnoverRate = this.quote.turnover_rate || [];
+            const macd = this.quote.macd || { dif: [], dea: [], hist: [] };
+            const closes = ohlc.map(k => k ? k[1] : null);
+
+            // 计算简单移动平均线
+            const sma = (arr, n) => arr.map((_, i) => {
+                if (i < n - 1) return null;
+                let sum = 0, c = 0;
+                for (let j = 0; j < n; j++) {
+                    const v = arr[i - j];
+                    if (v != null) { sum += v; c++; }
+                }
+                return c > 0 ? +(sum / c).toFixed(4) : null;
+            });
+            const ma5 = sma(closes, 5);
+            const ma10 = sma(closes, 10);
+            const ma20 = sma(closes, 20);
+
+            // 成交量颜色与 K 线方向一致
+            const volumeData = volume.map((v, i) => {
+                const up = ohlc[i] && ohlc[i][1] >= ohlc[i][0];
+                return { value: v, itemStyle: { color: up ? '#ef4444' : '#22c55e' } };
+            });
+
+            // MACD 柱状图颜色（与 K 线红涨绿跌保持一致）
+            const histData = (macd.hist || []).map(v => {
+                if (v == null) return { value: 0, itemStyle: { color: 'transparent' } };
+                return { value: v, itemStyle: { color: v >= 0 ? '#ef4444' : '#22c55e' } };
+            });
+
+            // 根据周期设置默认显示区间；后端已返回全量数据，这里仅控制默认缩放
+            let zoomStart = 0, zoomEnd = 100;
+            if (this.timeframe === 'daily') {
+                // 日线默认展示最近 120 根（约半年）
+                zoomStart = Math.max(0, (1 - 120 / dates.length) * 100);
+                zoomEnd = 100;
+            } else if (this.timeframe === 'weekly') {
+                // 周线默认展示最近 104 根（约 2 年）
+                zoomStart = Math.max(0, (1 - 104 / dates.length) * 100);
+                zoomEnd = 100;
+            } else if (this.timeframe === 'monthly') {
+                // 月线默认展示最近 60 根（约 5 年）
+                zoomStart = Math.max(0, (1 - 60 / dates.length) * 100);
+                zoomEnd = 100;
+            }
+
+            const option = {
+                animation: false,
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    backgroundColor: 'rgba(255,255,255,0.98)',
+                    borderColor: '#e5e7eb',
+                    borderWidth: 1,
+                    padding: [8, 10],
+                    transitionDuration: 0,
+                    hideDelay: 0,
+                    textStyle: { color: '#374151', fontSize: 11 },
+                    formatter: (params) => {
+                        if (!params || !params.length) return '';
+                        const idx = params[0].dataIndex;
+                        if (idx == null || idx < 0 || idx >= dates.length) return '';
+                        const d = dates[idx];
+                        const k = ohlc[idx];
+                        let html = `<div class="font-mono text-xs"><div class="font-bold mb-1">${d || '-'}</div>`;
+                        if (k && Array.isArray(k) && k[0] != null && k[1] != null && k[2] != null && k[3] != null) {
+                            const up = k[1] >= k[0];
+                            const color = up ? '#ef4444' : '#22c55e';
+                            html += `<div>开: <span style="color:${color}">${k[0].toFixed(2)}</span> 收: <span style="color:${color}">${k[1].toFixed(2)}</span> 低: ${k[2].toFixed(2)} 高: ${k[3].toFixed(2)}</div>`;
+                        }
+                        html += `<div>成交量: ${App.fmtNum(volume[idx] || 0, 0)}</div>`;
+                        const amt = amount[idx];
+                        if (amt != null) html += `<div>成交额: ${App.fmtNum(amt, 0)}</div>`;
+                        const tr = turnoverRate[idx];
+                        if (tr != null) html += `<div>换手率: ${tr.toFixed(2)}%</div>`;
+                        const maParts = [];
+                        if (ma5[idx] != null) maParts.push(`MA5: ${ma5[idx].toFixed(2)}`);
+                        if (ma10[idx] != null) maParts.push(`MA10: ${ma10[idx].toFixed(2)}`);
+                        if (ma20[idx] != null) maParts.push(`MA20: ${ma20[idx].toFixed(2)}`);
+                        if (maParts.length) html += `<div>${maParts.join(' ')}</div>`;
+                        const dif = macd.dif[idx], dea = macd.dea[idx], hist = macd.hist[idx];
+                        const macdParts = [];
+                        if (dif != null) macdParts.push(`DIF: ${dif.toFixed(3)}`);
+                        if (dea != null) macdParts.push(`DEA: ${dea.toFixed(3)}`);
+                        if (hist != null) macdParts.push(`HIST: ${hist.toFixed(3)}`);
+                        if (macdParts.length) html += `<div>MACD ${macdParts.join(' ')}</div>`;
+                        html += '</div>';
+                        return html;
+                    }
+                },
+                axisPointer: {
+                    link: [{ xAxisIndex: 'all' }],
+                    label: { backgroundColor: '#777' }
+                },
+                // 进一步增加整体高度与 MACD 子图高度，使图表更方正、趋势更陡峭
+                grid: [
+                    { left: '10%', right: '4%', top: '4%', height: '44%' },
+                    { left: '10%', right: '4%', top: '51%', height: '18%' },
+                    { left: '10%', right: '4%', top: '68%', height: '20%' }
+                ],
+                xAxis: [
+                    { type: 'category', data: dates, scale: true, boundaryGap: false, axisLine: { lineStyle: { color: '#d1d5db' } }, axisLabel: { show: false }, splitLine: { show: false } },
+                    { type: 'category', data: dates, gridIndex: 1, scale: true, boundaryGap: false, axisLine: { lineStyle: { color: '#d1d5db' } }, axisLabel: { show: false }, splitLine: { show: false } },
+                    { type: 'category', data: dates, gridIndex: 2, scale: true, boundaryGap: false, axisLine: { lineStyle: { color: '#d1d5db' } }, axisLabel: { color: '#6b7280', fontSize: 10 }, splitLine: { show: false } }
+                ],
+                yAxis: [
+                    { scale: true, splitArea: { show: true, areaStyle: { color: ['rgba(250,250,250,0.5)', 'rgba(245,247,250,0.5)'] } }, axisLine: { show: false }, axisLabel: { color: '#6b7280', fontSize: 10 }, splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } } },
+                    { scale: true, gridIndex: 1, splitNumber: 2, axisLine: { show: false }, axisLabel: { show: false }, splitLine: { show: false } },
+                    { scale: true, gridIndex: 2, splitNumber: 2, axisLine: { show: false }, axisLabel: { color: '#6b7280', fontSize: 10 }, splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } } }
+                ],
+                dataZoom: [
+                    { type: 'inside', xAxisIndex: [0, 1, 2], start: zoomStart, end: zoomEnd, filterMode: 'filter', zoomOnMouseWheel: false, moveOnMouseMove: true, moveOnMouseWheel: false },
+                    {
+                        type: 'slider',
+                        filterMode: 'filter',
+                        xAxisIndex: [0, 1, 2],
+                        start: zoomStart,
+                        end: zoomEnd,
+                        height: 22,
+                        bottom: 32,
+                        left: '10%',
+                        right: '4%',
+                        borderColor: '#e5e7eb',
+                        fillerColor: 'rgba(79,70,229,0.18)',
+                        handleStyle: { color: '#4f46e5', borderColor: '#4f46e5', borderWidth: 1 },
+                        handleSize: '70%',
+                        backgroundColor: '#f9fafb',
+                        dataBackground: { lineStyle: { color: '#d1d5db', width: 1 }, areaStyle: { color: '#e5e7eb' } },
+                        selectedDataBackground: { lineStyle: { color: '#4f46e5', width: 1 }, areaStyle: { color: '#c7d2fe' } },
+                        textStyle: { color: '#6b7280', fontSize: 10 },
+                        brushSelect: false,
+                        showDetail: true
+                    }
+                ],
+                series: [
+                    {
+                        name: 'K线',
+                        type: 'candlestick',
+                        data: ohlc,
+                        // 控制单根 K 线宽度，避免数据量大时实体过宽压盖影线
+                        barMaxWidth: 10,
+                        barMinWidth: 2,
+                        itemStyle: {
+                            color: '#ef4444',
+                            color0: '#22c55e',
+                            borderColor: '#ef4444',
+                            borderColor0: '#22c55e',
+                            borderWidth: 1
+                        }
+                    },
+                    { name: 'MA5', type: 'line', data: ma5, showSymbol: false, smooth: false, lineStyle: { width: 1, color: '#f59e0b' } },
+                    { name: 'MA10', type: 'line', data: ma10, showSymbol: false, smooth: false, lineStyle: { width: 1, color: '#3b82f6' } },
+                    { name: 'MA20', type: 'line', data: ma20, showSymbol: false, smooth: false, lineStyle: { width: 1, color: '#8b5cf6' } },
+                    {
+                        name: '成交量',
+                        type: 'bar',
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        data: volumeData
+                    },
+                    {
+                        name: 'MACD-HIST',
+                        type: 'bar',
+                        xAxisIndex: 2,
+                        yAxisIndex: 2,
+                        data: histData
+                    },
+                    {
+                        name: 'DIF',
+                        type: 'line',
+                        xAxisIndex: 2,
+                        yAxisIndex: 2,
+                        data: macd.dif,
+                        showSymbol: false,
+                        lineStyle: { width: 1, color: '#3b82f6' }
+                    },
+                    {
+                        name: 'DEA',
+                        type: 'line',
+                        xAxisIndex: 2,
+                        yAxisIndex: 2,
+                        data: macd.dea,
+                        showSymbol: false,
+                        lineStyle: { width: 1, color: '#f59e0b' }
+                    }
+                ]
+            };
+
+            chart.setOption(option, true);
+            this.$nextTick(() => {
+                if (chart) chart.resize();
+            });
+        },
+    };
+}
+</script>
+{% endblock %}

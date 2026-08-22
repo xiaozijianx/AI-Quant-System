@@ -1,0 +1,194 @@
+{
+  "summary": {
+    "total_news": 10,
+    "events_detected": 10,
+    "bullish_events": 6,
+    "bearish_events": 4,
+    "policy_events": 0
+  },
+  "events": [
+    {
+      "news_index": 0,
+      "news_preview": "交易所2026年8月6日公布的交易公开信息显示，中钨高新因成为连续三个交易日内，涨幅偏离值累计达到20%的证券上榜。中钨高新当日收报62.5元，涨跌幅8.83%，换手率11.80%，成交额105.22亿。异常期间8月4日至8月6日，期间涨幅30.24%，累计偏离值25.31%，区间成交额 中钨高新0",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "股价异常波动",
+      "event_description": "中钨高新因连续三个交易日内涨幅偏离值累计达到20%而被交易所公布为异常交易证券。",
+      "related_stocks": [
+        "中钨高新"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 股价异常波动"
+    },
+    {
+      "news_index": 1,
+      "news_preview": "交易所2026年8月5日公布的交易公开信息显示，中钨高新因成为日涨幅偏离值达到7%的前5只证券上榜。中钨高新当日收报57.43元，涨跌幅10.00%，偏离值7.93%，换手率5.70%，成交额45.91亿。 免责声明：本文基于AI生产，仅供参考，不构成任何投资建议，据此操作风险自担 中钨高新0006",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "股价异动",
+      "event_description": "中钨高新因日涨幅偏离值达到7%而上榜交易公开信息。",
+      "related_stocks": [
+        "000657"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 股价异动"
+    },
+    {
+      "news_index": 2,
+      "news_preview": "南财智讯8月5日电，盘后数据显示，因当日异动登上龙虎榜的个股中，龙虎榜中资金净流出最多的前三位分别是太极实业(600667.SH)、江钨装备(600397.SH)与中钨高新000657.SZ)。其中排名第一的太极实业被净卖出2.43亿元，占总成交金额的2.84%。 8月5日龙虎榜净卖出额前10个股",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利空",
+      "event_category": "机构资金流出",
+      "event_description": "8月5日龙虎榜显示，太极实业、江钨装备和中钨高新被机构资金大幅净卖出。",
+      "related_stocks": [
+        "600667.SH",
+        "600397.SH",
+        "000657.SZ"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "回避",
+      "signal_reason": "利空事件 - 机构资金流出"
+    },
+    {
+      "news_index": 3,
+      "news_preview": "南方财经8月6日电，8月6日，小金属盘中上涨3.12%，相关成分股中，云南锗业（002428）上涨10.00%，中钨高新（000657）上涨7.68%，东方钽业（000962）上涨5.98%，山金国际（000975）上涨5.70%，翔鹭钨业（002842）上涨5.27%。 小金属概念强势拉升，AI算",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "需求扩张",
+      "event_description": "小金属概念因AI算力驱动需求扩张而强势拉升。",
+      "related_stocks": [
+        "云南锗业（002428）",
+        "中钨高新（000657）",
+        "东方钽业（000962）",
+        "山金国际（000975）",
+        "翔鹭钨业（002842）"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 需求扩张"
+    },
+    {
+      "news_index": 4,
+      "news_preview": "其中，机构净买入前三分别为东山精密(002384.SZ)、杭电股份(603618.SH)与蘅东光(920045.BJ)，详情见下图：机构净卖出的个股中，前三分别为中钨高新000657.SZ)、科达制造(600499.SH)与亨通光电(600487.SH)。 8月5日龙虎榜机构席位买卖详情",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利空",
+      "event_category": "机构净卖出",
+      "event_description": "8月5日龙虎榜显示机构席位对部分股票进行大规模净卖出。",
+      "related_stocks": [
+        "000657.SZ",
+        "600499.SH",
+        "600487.SH"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "回避",
+      "signal_reason": "利空事件 - 机构净卖出"
+    },
+    {
+      "news_index": 5,
+      "news_preview": "8月6日，小金属盘中上涨3.12%，相关成分股中，云南锗业（002428）上涨10.00%，中钨高新（000657）上涨7.68%，东方钽业（000962）上涨5.98%，山金国际（000975）上涨5.70%，翔鹭钨业（002842）上涨5.27%。 小金属概念强势拉升，板块正转向基本面驱动的上行",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "基本面驱动",
+      "event_description": "小金属概念强势拉升，板块正转向基本面驱动的上行通道。",
+      "related_stocks": [
+        "云南锗业（002428）",
+        "中钨高新（000657）",
+        "东方钽业（000962）",
+        "山金国际（000975）",
+        "翔鹭钨业（002842）"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 基本面驱动"
+    },
+    {
+      "news_index": 6,
+      "news_preview": "1.44 34.79 001267 汇绿生态 -976.64 10.01 5.02 300552 万集科技 -1887.28 20.02 16.15 002396 星网锐捷 -3908.45 10.00 12.81 002851 麦格米特 -3912.07 9.08 8.38 000657 深股通现",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利空",
+      "event_category": "股东减持",
+      "event_description": "深股通出现在14只个股的龙虎榜中，可能表明有资金流出或减持行为。",
+      "related_stocks": [
+        "000657",
+        "001267",
+        "300552",
+        "002396",
+        "002851",
+        "000657"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "谨慎",
+      "signal_reason": "内部人士减持可能释放负面信号"
+    },
+    {
+      "news_index": 7,
+      "news_preview": "净卖出金额最多的是中钨高新（000657.SZ），为2.22亿元，占总成交金额的4.83%，当日收盘上涨10%，换手率为5.7%。 10.8亿资金抢筹亨通光电，机构狂买东山精密丨龙虎榜",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "机构资金流入",
+      "event_description": "大量资金抢筹亨通光电，机构买入东山精密。",
+      "related_stocks": [
+        "000657.SZ",
+        "亨通光电",
+        "东山精密"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 机构资金流入"
+    },
+    {
+      "news_index": 8,
+      "news_preview": "12.38 54.83 30.00 1611.90 1 53.73 -2.01 002617 露笑科技 2.11 6.30 285.00 1584.60 1 5.56 -11.75 001309 德明利 4.35 364.18 3.92 1427.59 2 364.18 0.00 000657 3只",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利空",
+      "event_category": "股东减持",
+      "event_description": "有三只个股的大宗交易金额超过5000万元，可能表明股东在减持股份。",
+      "related_stocks": [
+        "002617",
+        "001309",
+        "000657"
+      ],
+      "urgency": "中",
+      "confidence": 4,
+      "signal": "谨慎",
+      "signal_reason": "内部人士减持可能释放负面信号"
+    },
+    {
+      "news_index": 9,
+      "news_preview": "（数据宝） 有色金属行业资金流入榜 代码 简称 今日涨跌幅（%） 今日换手率（%） 主力资金流量（万元） 000831 中国稀土 10.00 5.73 115530.01 000657 中钨高新 7.22 10.52 55127.93 601899 紫金矿业 1.88 1.33 70.77亿元资金今",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "资金流入",
+      "event_description": "有色金属行业今日出现大量资金流入，其中中国稀土、中钨高新和紫金矿业为主要受益股票。",
+      "related_stocks": [
+        "000831",
+        "000657",
+        "601899"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 资金流入"
+    }
+  ]
+}

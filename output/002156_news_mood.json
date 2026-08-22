@@ -1,0 +1,20 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 8,
+  "negative_count": 1,
+  "neutral_count": 1,
+  "top_themes": [
+    "半导体行业",
+    "资金流入",
+    "国家大基金"
+  ],
+  "risk_alerts": [
+    "通富微电股价波动较大，需关注其后续表现"
+  ],
+  "opportunity_hints": [
+    "关注资金流入明显的半导体和电子行业个股",
+    "关注国家大基金持股概念"
+  ],
+  "summary": "整体市场情绪偏乐观，多数新闻显示积极信号，资金流入明显。"
+}

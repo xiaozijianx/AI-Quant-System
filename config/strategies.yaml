@@ -1,0 +1,6 @@
+# 实盘监控 -- 策略路由表 (由 /live 页面写入)
+# 修改后, 在页面点 '应用策略配置' 即可热加载, 无需重启
+# MACD: macd_5min=5分钟K(日内) / macd_1d=日K(12/26/9); 另有 dual_ma_5min / ma20_hold / multi_factor_top / dragon_picker / grid_classic
+
+default: macd_5min
+per_stock: {}

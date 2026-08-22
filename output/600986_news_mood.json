@@ -1,0 +1,21 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 6,
+  "negative_count": 1,
+  "neutral_count": 4,
+  "top_themes": [
+    "小红书概念",
+    "快手概念",
+    "电子竞技概念"
+  ],
+  "risk_alerts": [
+    "浙文互联因商誉和减值问题被上交所问询"
+  ],
+  "opportunity_hints": [
+    "小红书概念股票上涨",
+    "快手概念上涨",
+    "电子竞技概念上涨"
+  ],
+  "summary": "整体市场情绪偏向乐观，多概念板块上涨，但需关注浙文互联的负面消息。"
+}

@@ -1,0 +1,192 @@
+{
+  "total_capital": 1000000,
+  "updated_at": "2026-04-18T18:46:48",
+  "strategies": {
+    "dragon_first_board": {
+      "name": "dragon_first_board",
+      "description": "龙头首板战法",
+      "stage": "production",
+      "capital_allocated": 300000.0,
+      "capital_pct": 0.3,
+      "kpi": {
+        "rolling_30d_sharpe": 1.2,
+        "rolling_30d_return": 0.045,
+        "rolling_30d_maxdd": 0.018,
+        "days_since_promotion": 90,
+        "consecutive_low_sharpe_days": 0,
+        "total_trades": 68,
+        "win_rate": 0.0,
+        "walk_forward_is_oos_ratio": 0.85
+      },
+      "created_at": "2026-04-18",
+      "last_updated": "2026-04-18",
+      "history": [
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": null,
+          "to": "production",
+          "reason": "新建"
+        }
+      ]
+    },
+    "multi_factor_csi300": {
+      "name": "multi_factor_csi300",
+      "description": "沪深 300 多因子选股",
+      "stage": "production",
+      "capital_allocated": 300000.0,
+      "capital_pct": 0.3,
+      "kpi": {
+        "rolling_30d_sharpe": 0.8,
+        "rolling_30d_return": 0.022,
+        "rolling_30d_maxdd": 0.035,
+        "days_since_promotion": 60,
+        "consecutive_low_sharpe_days": 0,
+        "total_trades": 45,
+        "win_rate": 0.0,
+        "walk_forward_is_oos_ratio": 0.72
+      },
+      "created_at": "2026-04-18",
+      "last_updated": "2026-04-18",
+      "history": [
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": null,
+          "to": "production",
+          "reason": "新建"
+        }
+      ]
+    },
+    "sector_rotation": {
+      "name": "sector_rotation",
+      "description": "板块轮动 ETF",
+      "stage": "production",
+      "capital_allocated": 300000.0,
+      "capital_pct": 0.3,
+      "kpi": {
+        "rolling_30d_sharpe": 0.65,
+        "rolling_30d_return": 0.018,
+        "rolling_30d_maxdd": 0.025,
+        "days_since_promotion": 0,
+        "consecutive_low_sharpe_days": 0,
+        "total_trades": 12,
+        "win_rate": 0.0,
+        "walk_forward_is_oos_ratio": 0.78
+      },
+      "created_at": "2026-04-18",
+      "last_updated": "2026-04-18",
+      "history": [
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": null,
+          "to": "probation",
+          "reason": "新建"
+        },
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": "probation",
+          "to": "production",
+          "reason": "试用期 Sharpe 0.65 > 0.5, 升为主力"
+        }
+      ]
+    },
+    "dqn_ethan": {
+      "name": "dqn_ethan",
+      "description": "DQN 强化学习择时",
+      "stage": "probation",
+      "capital_allocated": 50000.0,
+      "capital_pct": 0.05,
+      "kpi": {
+        "rolling_30d_sharpe": 0.4,
+        "rolling_30d_return": 0.012,
+        "rolling_30d_maxdd": 0.04,
+        "days_since_promotion": 0,
+        "consecutive_low_sharpe_days": 0,
+        "total_trades": 18,
+        "win_rate": 0.0,
+        "walk_forward_is_oos_ratio": 0.55
+      },
+      "created_at": "2026-04-18",
+      "last_updated": "2026-04-18",
+      "history": [
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": null,
+          "to": "paper",
+          "reason": "新建"
+        },
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": "paper",
+          "to": "probation",
+          "reason": "纸交易 22 天, 收益 +1.20%, 回撤 4.00%, 通过试用门槛"
+        }
+      ]
+    },
+    "breakout_naive": {
+      "name": "breakout_naive",
+      "description": "新写的突破策略 (待孵化)",
+      "stage": "paper",
+      "capital_allocated": 0.0,
+      "capital_pct": 0.0,
+      "kpi": {
+        "rolling_30d_sharpe": 0.0,
+        "rolling_30d_return": 0.0,
+        "rolling_30d_maxdd": 0.0,
+        "days_since_promotion": 0,
+        "consecutive_low_sharpe_days": 0,
+        "total_trades": 0,
+        "win_rate": 0.0,
+        "walk_forward_is_oos_ratio": 0.78
+      },
+      "created_at": "2026-04-18",
+      "last_updated": "2026-04-18",
+      "history": [
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": null,
+          "to": "incubating",
+          "reason": "新建"
+        },
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": "incubating",
+          "to": "paper",
+          "reason": "Walk-Forward IS/OOS 比例 0.78 >= 0.70, 通过孵化"
+        }
+      ]
+    },
+    "old_macd_naive": {
+      "name": "old_macd_naive",
+      "description": "老版 MACD 双均线 (即将退役)",
+      "stage": "retired",
+      "capital_allocated": 0.0,
+      "capital_pct": 0.0,
+      "kpi": {
+        "rolling_30d_sharpe": 0.15,
+        "rolling_30d_return": -0.008,
+        "rolling_30d_maxdd": 0.062,
+        "days_since_promotion": 0,
+        "consecutive_low_sharpe_days": 18,
+        "total_trades": 22,
+        "win_rate": 0.0,
+        "walk_forward_is_oos_ratio": 0.0
+      },
+      "created_at": "2026-04-18",
+      "last_updated": "2026-04-18",
+      "history": [
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": null,
+          "to": "production",
+          "reason": "新建"
+        },
+        {
+          "ts": "2026-04-18T18:46:48",
+          "from": "production",
+          "to": "retired",
+          "reason": "连续 18 天 Sharpe 低于阈值"
+        }
+      ]
+    }
+  }
+}

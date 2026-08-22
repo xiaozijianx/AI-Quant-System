@@ -1,0 +1,20 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 6,
+  "negative_count": 1,
+  "neutral_count": 4,
+  "top_themes": [
+    "转基因概念",
+    "农业股",
+    "大豆概念"
+  ],
+  "risk_alerts": [
+    "农林牧渔行业出现资金净流出，可能引发波动"
+  ],
+  "opportunity_hints": [
+    "关注转基因概念和农业股的持续上涨趋势",
+    "留意资金流入明显的股票"
+  ],
+  "summary": "市场情绪整体偏乐观，多个农业相关概念表现强势，但需关注农林牧渔行业的资金流出风险。"
+}

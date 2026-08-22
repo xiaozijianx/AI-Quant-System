@@ -1,0 +1,181 @@
+{
+  "summary": {
+    "total_news": 10,
+    "events_detected": 9,
+    "bullish_events": 9,
+    "bearish_events": 0,
+    "policy_events": 0
+  },
+  "events": [
+    {
+      "news_index": 0,
+      "news_preview": "交易所2026年8月3日公布的交易公开信息显示，天娱数科因成为日涨幅偏离值达到7%的前5只证券上榜。天娱数科当日收报7.16元，涨跌幅9.98%，偏离值10.33%，换手率7.74%，成交额8.99亿。 免责声明：本文基于AI生产，仅供参考，不构成任何投资建议，据此操作风险自担。东方财富发布此内容旨",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "股票异常波动",
+      "event_description": "天娱数科因日涨幅偏离值达到7%而上榜交易公开信息。",
+      "related_stocks": [
+        "002354"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 股票异常波动"
+    },
+    {
+      "news_index": 1,
+      "news_preview": "其中教育板块的传智教育（003032.SZ）拿下6连板，乳业股一鸣食品（605179.SH）实现5连板，AI应用概念股利欧股份（002131.SZ）、恒银科技（603106.SH）、天娱数科（002354.SZ）均收获2连板。 8月3日A股共有83只个股涨停 传智教育斩获6连板",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "涨停连板",
+      "event_description": "多只个股实现连续涨停，显示市场对相关股票的积极情绪。",
+      "related_stocks": [
+        "003032.SZ",
+        "605179.SH",
+        "002131.SZ",
+        "603106.SH",
+        "002354.SZ"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 涨停连板"
+    },
+    {
+      "news_index": 2,
+      "news_preview": "板块表现方面，核电板块逆势走强表现亮眼，久盛电气（301082.SZ）、合锻智能（603011.SH）、融发核电（002366.SZ）、中国核建（601611.SH）均封涨停；AI应用端行情反复活跃，传智教育（003032.SZ）收获6连板，天娱数科（002354.SZ）、恒银科技 8月3日A股收盘",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "板块上涨",
+      "event_description": "核电板块逆势走强，多只相关股票涨停。",
+      "related_stocks": [
+        "301082.SZ",
+        "603011.SH",
+        "002366.SZ",
+        "601611.SH"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 板块上涨"
+    },
+    {
+      "news_index": 3,
+      "news_preview": "板块层面，AI应用端反复活跃，传智教育（003032.SZ）6连板，天娱数科（002354.SZ）、恒银科技（603106.SH）2连板，吉宏股份（002803.SZ）涨停；核电板块当日走强，久盛电气（301082.SZ）、利伯特、合锻智能（603011.SH）、融发核电（002366 8月3日A股",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "板块活跃",
+      "event_description": "AI应用端和核电板块当日走强，多只股票涨停或连板。",
+      "related_stocks": [
+        "003032.SZ",
+        "002354.SZ",
+        "603106.SH",
+        "002803.SZ",
+        "301082.SZ",
+        "603011.SH",
+        "002366"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 板块活跃"
+    },
+    {
+      "news_index": 4,
+      "news_preview": "1708.83 5854.04 29.19 1.64 600782 新钢股份 4387.10 16106.70 27.24 0.34 301088 戎美股份 698.53 2618.05 26.68 2.92 688370 丛麟科技 206.57 788.41 26.20 1.53 002354 解",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "融资客大举买入",
+      "event_description": "融资客大举买入部分个股，显示市场对相关股票的看好。",
+      "related_stocks": [
+        "600782",
+        "301088",
+        "688370",
+        "002354"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 融资客大举买入"
+    },
+    {
+      "news_index": 5,
+      "news_preview": "4.56 13.67 14.48 5.95 001331 胜通能源 9.99 1.80 40.44 42.81 5.87 603039 泛微网络 6.07 19.58 37.52 39.69 5.78 300112 万讯自控 12.67 17.67 7.66 8.09 5.59 002354 今日8",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "个股突破半年线",
+      "event_description": "86只个股突破半年线，可能表明股价短期走势强劲。",
+      "related_stocks": [
+        "001331",
+        "603039",
+        "300112"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 个股突破半年线"
+    },
+    {
+      "news_index": 7,
+      "news_preview": "日突破半年线个股乖离率排名 证券代码 证券简称 今日涨跌幅（%） 今日换手率（%） 半年线（元） 最新价（元） 乖离率（%） 603039 泛微网络 9.99 10.30 37.53 41.16 9.66 001331 胜通能源 9.99 1.69 40.44 42.81 5.87 002354 今",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "突破半年线",
+      "event_description": "部分个股今日盘中突破半年线，显示股价可能进入上升趋势。",
+      "related_stocks": [
+        "603039",
+        "001331"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 突破半年线"
+    },
+    {
+      "news_index": 8,
+      "news_preview": "掌阅科技 9001.62 49.62 0.92 9.98 920130 立方控股 688.53 48.23 0.59 29.98 301218 华是科技 18814.28 42.04 6.47 16.40 000510 新金路 11068.01 41.36 1.35 3.85 002354 【数据揭",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "融资客看好",
+      "event_description": "融资客看好部分个股，表明市场对相关股票的短期前景持乐观态度。",
+      "related_stocks": [
+        "9001.62",
+        "688.53",
+        "18814.28",
+        "11068.01",
+        "000510",
+        "002354"
+      ],
+      "urgency": "高",
+      "confidence": 4,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 融资客看好"
+    },
+    {
+      "news_index": 9,
+      "news_preview": "7.03 电子 688012 中微公司 -0.72 23478.20 475183.97 1.47 电子 002415 海康威视 5.70 22695.75 517506.53 1.52 计算机 688111 金山办公 6.90 21093.58 487812.00 3.90 计算机 002354 ",
+      "detection_method": "llm",
+      "has_event": true,
+      "event_type": "利好",
+      "event_category": "杠杆资金买入",
+      "event_description": "多只股票获得杠杆资金净买入超亿元。",
+      "related_stocks": [
+        "688012",
+        "002415",
+        "688111"
+      ],
+      "urgency": "高",
+      "confidence": 5,
+      "signal": "关注",
+      "signal_reason": "利好事件 - 杠杆资金买入"
+    }
+  ]
+}

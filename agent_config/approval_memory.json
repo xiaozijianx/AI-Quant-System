@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "tools": [
+    "editor",
+    "file_write",
+    "run_commands"
+  ],
+  "updated_at": "2026-08-02T09:21:45.838600+00:00"
+}

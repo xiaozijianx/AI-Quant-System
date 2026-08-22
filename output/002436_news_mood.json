@@ -1,0 +1,22 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 6,
+  "negative_count": 0,
+  "neutral_count": 4,
+  "top_themes": [
+    "兴森科技",
+    "电子行业",
+    "玻璃基板概念"
+  ],
+  "risk_alerts": [
+    "中性新闻显示市场存在分歧",
+    "部分个股资金流向未明确"
+  ],
+  "opportunity_hints": [
+    "关注资金流入明显的电子及通信板块",
+    "留意主力资金净流入的股票",
+    "关注玻璃基板概念的持续热度"
+  ],
+  "summary": "整体市场情绪偏乐观，多只个股获资金青睐，电子行业表现活跃。"
+}

@@ -1,0 +1,1196 @@
+{% extends "base.html" %}
+
+{% block title %}龙头复盘 - AI 量化交易系统{% endblock %}
+
+{% block plotly %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">龙头复盘</h1>
+        <p class="page-subtitle">每日涨停结构、板块/概念热度与轮动信号</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-4" x-data="dragonReviewApp()" x-init="init()">
+    <!-- 左侧矩阵 -->
+    <div class="lg:col-span-3 card">
+        <div class="card-header flex-wrap gap-2">
+            <div>
+                <div class="card-title">每日龙头结构</div>
+                <div class="card-subtitle" x-text="statusText"></div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-1">
+                    <span class="text-xs text-gray-500">截止</span>
+                    <input type="date" class="form-input text-xs py-1 px-2" style="width: 130px;"
+                           x-model="endDate" @keydown.enter="loadMatrix()"/>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button class="btn btn-sm" :class="days === 5 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="loading" @click="setDays(5)">5日</button>
+                    <button class="btn btn-sm" :class="days === 10 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="loading" @click="setDays(10)">10日</button>
+                    <button class="btn btn-sm" :class="days === 15 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="loading" @click="setDays(15)">15日</button>
+                </div>
+                <button class="btn btn-sm btn-primary" :disabled="loading" @click="loadMatrix()">查询</button>
+                <button class="btn btn-sm btn-secondary" :disabled="loading" @click="loadMatrix()">刷新</button>
+                <a href="/data-collection" class="btn btn-sm btn-secondary">去采集数据</a>
+            </div>
+        </div>
+
+        <div x-show="loading" class="text-gray-500 py-8 text-center">正在加载数据...</div>
+        <div x-show="!loading && !hasData" class="text-gray-500 py-8 text-center">
+            暂无龙头复盘数据，请先运行「数据采集 -> 龙头数据准备」。
+        </div>
+
+        <div x-show="!loading && hasData" class="overflow-x-auto">
+            <table class="w-full text-xs border-collapse" style="table-layout: fixed;">
+                <thead>
+                    <tr class="bg-gray-50 text-gray-700">
+                        <th class="px-1 py-2 text-left sticky left-0 bg-gray-50 z-10 w-[40px]">日期</th>
+                        <th class="px-1 py-2 text-left w-[80px]">大盘成交额</th>
+                        <th class="px-2 py-2 text-left w-[115px]">轮动候选股</th>
+                        <th class="px-2 py-2 text-left w-[135px]">龙头板块/概念</th>
+                        <th class="px-2 py-2 text-left w-[135px]">二板最多板块/概念</th>
+                        <th class="px-2 py-2 text-left w-[135px]">三板个股</th>
+                        <th class="px-2 py-2 text-left w-[110px]">四板个股</th>
+                        <th class="px-2 py-2 text-left w-[110px]">五板及以上</th>
+                        <th class="px-2 py-2 text-left w-[105px]">断板股</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="row in rows" :key="row.date">
+                        <tr class="border-b border-gray-100 align-top"
+                            :class="row.is_rotation_signal ? 'bg-red-50' : 'hover:bg-gray-50'">
+                            <td class="px-1 py-2 sticky left-0 z-10"
+                                :class="row.is_rotation_signal ? 'bg-red-50' : 'bg-white'">
+                                <div class="font-medium" x-text="formatDate(row.date)"></div>
+                                <div x-show="row.is_volume_up" class="text-[10px] text-red-600 mt-0.5">放量</div>
+                            </td>
+
+                            <!-- 大盘成交额 -->
+                            <td class="px-1 py-2">
+                                <div class="font-mono" x-text="formatAmount(row.market_amount)"></div>
+                                <div class="text-[10px] text-gray-400">
+                                    <span x-text="params.volume_ma + '日均:'"></span>
+                                    <span x-text="formatAmount(row.market_amount_avg_ma)"></span>
+                                </div>
+                                <div class="text-[10px]" :class="pnlClass(row.market_index_change)"
+                                     x-show="row.market_index_change !== undefined"
+                                     x-text="'上证 ' + fmtSign(row.market_index_change, 2, '%')"></div>
+                            </td>
+
+                            <!-- 轮动候选股：按个股去重，展示命中的所有新板块/概念 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="c in row.candidates" :key="c.code">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-red-400 rounded px-1 py-0.5 bg-red-100 text-red-700 text-[11px] leading-tight min-w-[60px]"
+                                             @click="selectStock(c.code, c.name, row.date)">
+                                            <!-- 第一行：股票名 + 来源标签，允许自然换行，但文字保持横排 -->
+                                            <div class="break-words">
+                                                <span class="font-medium" x-text="c.name"></span>
+                                                <template x-for="src in c.sources" :key="src.name">
+                                                    <span class="ml-0.5 px-1 rounded-full bg-white/60 text-[9px] align-middle"
+                                                          :class="src.type === 'sector' ? 'text-blue-600' : 'text-purple-600'"
+                                                          x-text="src.name"></span>
+                                                </template>
+                                            </div>
+                                            <!-- 第二行：成交额 + 放量 + 涨幅，允许自然换行 -->
+                                            <div class="break-words text-[9px] opacity-80">
+                                                <span class="font-mono" x-text="formatAmountSmall(c.amount)"></span>
+                                                <span x-show="c.volume_up_ratio" class="ml-1 text-red-800/70"
+                                                      x-text="'量' + c.volume_up_ratio.toFixed(2) + 'x'"></span>
+                                                <span x-show="c.gain_pct !== null && c.gain_pct !== undefined" class="ml-1"
+                                                      :class="pnlClass(c.gain_pct)"
+                                                      x-text="fmtSign(c.gain_pct, 1, '%')"></span>
+                                            </div>
+                                            <!-- 第三行：5 维打分明细 -->
+                                            <div class="break-words text-[9px] opacity-80">
+                                                <span class="font-mono" x-text="'综合' + (c.score || 0).toFixed(2)"></span>
+                                                <span x-show="c.leader_score_detail" class="ml-1">
+                                                    <span x-text="'强' + (c.leader_score_detail?.strength ?? 0).toFixed(2)"></span>
+                                                    <span x-text="'量' + (c.leader_score_detail?.amount ?? 0).toFixed(2)"></span>
+                                                    <span x-text="'换' + (c.leader_score_detail?.turnover ?? 0).toFixed(2)"></span>
+                                                    <span x-text="'位' + (c.leader_score_detail?.position ?? 0).toFixed(2)"></span>
+                                                    <span x-text="'相' + (c.leader_score_detail?.relevance ?? 0).toFixed(2)"
+                                                          :title="'原始相关系数: ' + (c.leader_score_detail?.relevance_raw ?? '无')"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="row.is_rotation_signal && row.candidates.length === 0"
+                                         class="text-[10px] text-gray-400 italic">
+                                        当日有切换信号，但新板块/个股均不满足低位条件，无候选。
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 龙头板块/概念 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="s in row.leader_sectors" :key="s.name">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-blue-400 rounded px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[11px] flex items-center gap-0.5"
+                                             @click="selectSector(s.name, row.date)">
+                                            <span x-text="s.name"></span>
+                                            <span class="text-[10px] font-mono" x-text="s.count"></span>
+                                            <span class="text-[9px] px-0.5 rounded"
+                                                  :class="s.data_status === 'low' ? 'bg-green-200 text-green-800' : (s.data_status === 'no_data' ? 'bg-gray-200 text-gray-500' : 'bg-red-200 text-red-800')"
+                                                  x-text="s.data_status === 'low' ? '低' : (s.data_status === 'no_data' ? '无' : '高')"></span>
+                                            <span class="text-[9px] px-0.5 rounded bg-white/60 text-gray-600"
+                                                  x-text="s.is_new ? '新' : '旧'"></span>
+                                            <span x-show="s.relation_type !== 'old'" class="text-[9px] px-0.5 rounded bg-white/60"
+                                                  :class="s.relation_type === 'inner' ? 'text-orange-600' : 'text-indigo-600'"
+                                                  x-text="s.relation_type === 'inner' ? '内' : '跨'"></span>
+                                        </div>
+                                    </template>
+                                    <template x-for="c in row.leader_concepts" :key="c.name">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-purple-400 rounded px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[11px] flex items-center gap-0.5"
+                                             @click="selectConcept(c.name, c.code, row.date)">
+                                            <span x-text="c.name"></span>
+                                            <span class="text-[10px] font-mono" x-text="c.count"></span>
+                                            <span class="text-[9px] px-0.5 rounded"
+                                                  :class="c.data_status === 'low' ? 'bg-green-200 text-green-800' : (c.data_status === 'no_data' ? 'bg-gray-200 text-gray-500' : 'bg-red-200 text-red-800')"
+                                                  x-text="c.data_status === 'low' ? '低' : (c.data_status === 'no_data' ? '无' : '高')"></span>
+                                            <span class="text-[9px] px-0.5 rounded bg-white/60 text-gray-600"
+                                                  x-text="c.is_new ? '新' : '旧'"></span>
+                                            <span x-show="c.relation_type !== 'old'" class="text-[9px] px-0.5 rounded bg-white/60"
+                                                  :class="c.relation_type === 'inner' ? 'text-orange-600' : 'text-indigo-600'"
+                                                  x-text="c.relation_type === 'inner' ? '内' : '跨'"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+
+                            <!-- 二板最多板块/概念 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="s in row.board2_sectors" :key="s.name">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-blue-400 rounded px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[11px]"
+                                             @click="selectSector(s.name, row.date)">
+                                            <span x-text="s.name"></span>
+                                            <span class="text-[10px] font-mono ml-0.5" x-text="s.count"></span>
+                                        </div>
+                                    </template>
+                                    <template x-for="c in row.board2_concepts" :key="c.name">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-purple-400 rounded px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[11px]"
+                                             @click="selectConcept(c.name, c.code, row.date)">
+                                            <span x-text="c.name"></span>
+                                            <span class="text-[10px] font-mono ml-0.5" x-text="c.count"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+
+                            <!-- 三板个股 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="s in row.board3" :key="s.code">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-gray-400 rounded px-1.5 py-0.5 bg-gray-100 text-gray-700 text-[11px]"
+                                             :class="s.is_hot ? 'ring-1 ring-orange-400' : ''"
+                                             @click="selectStock(s.code, s.name, row.date)">
+                                            <span x-text="s.name"></span>
+                                            <span x-show="s.hot_tags.length" class="ml-0.5 px-1 rounded-full bg-orange-100 text-orange-700 text-[9px]"
+                                                  x-text="s.hot_tags.join(', ')"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+
+                            <!-- 四板个股 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="s in row.board4" :key="s.code">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-gray-400 rounded px-1.5 py-0.5 bg-gray-100 text-gray-700 text-[11px]"
+                                             :class="s.is_hot ? 'ring-1 ring-orange-400' : ''"
+                                             @click="selectStock(s.code, s.name, row.date)">
+                                            <span x-text="s.name"></span>
+                                            <span x-show="s.hot_tags.length" class="ml-0.5 px-1 rounded-full bg-orange-100 text-orange-700 text-[9px]"
+                                                  x-text="s.hot_tags.join(', ')"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+
+                            <!-- 五板及以上 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="s in row.board5plus" :key="s.code">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-gray-400 rounded px-1.5 py-0.5 bg-gray-100 text-gray-700 text-[11px]"
+                                             :class="s.is_hot ? 'ring-1 ring-orange-400' : ''"
+                                             @click="selectStock(s.code, s.name, row.date)">
+                                            <span x-text="s.name"></span>
+                                            <span x-show="s.hot_tags.length" class="ml-0.5 px-1 rounded-full bg-orange-100 text-orange-700 text-[9px]"
+                                                  x-text="s.hot_tags.join(', ')"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+
+                            <!-- 断板股 -->
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="s in row.break_stocks" :key="s.code">
+                                        <div class="cursor-pointer hover:ring-2 hover:ring-gray-400 rounded px-1.5 py-0.5 bg-gray-100 text-gray-700 text-[11px]"
+                                             :class="s.is_hot ? 'bg-orange-100 text-orange-700 ring-1 ring-orange-400' : ''"
+                                             @click="selectStock(s.code, s.name, row.date)">
+                                            <span x-text="s.name"></span>
+                                            <span x-show="s.prev_board" class="text-[9px] opacity-75" x-text="'(' + s.prev_board + '板)'"></span>
+                                            <span x-show="s.is_hot && s.hot_tags.length" class="ml-0.5 px-1 rounded-full bg-white/60 text-[9px]"
+                                                  x-text="s.hot_tags.join(', ')"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 右侧：参数配置 + 详情（随页面整体滚动，不做 sticky，避免内容被压缩在小视窗内） -->
+    <div class="lg:col-span-1 flex flex-col gap-4 min-w-0">
+        <!-- 放量参数配置 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">放量参数</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">成交额均线</label>
+                    <input type="range" class="form-range h-1.5" min="5" max="60" step="5"
+                           x-model.number="params.volume_ma"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.volume_ma + '日'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">均线倍数</label>
+                    <input type="range" class="form-range h-1.5" min="1.0" max="1.5" step="0.05"
+                           x-model.number="params.volume_ratio_ma"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.volume_ratio_ma.toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">环比倍数</label>
+                    <input type="range" class="form-range h-1.5" min="1.0" max="1.5" step="0.05"
+                           x-model.number="params.volume_ratio_ring"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.volume_ratio_ring.toFixed(2)"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                放量 = 全 A 成交额 > 均线 × 均线倍数，且 > 昨日 × 环比倍数，且上证指数上涨。
+            </div>
+        </div>
+
+        <!-- 大盘情绪过滤 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">大盘情绪过滤</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">最大跌停</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="200" step="5"
+                           x-model.number="params.max_limit_down"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.max_limit_down + '只'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨跌停比</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="20" step="0.5"
+                           x-model.number="params.min_up_down_ratio"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.min_up_down_ratio.toFixed(1)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">上涨占比</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.min_rise_ratio"/>
+                    <span class="w-10 text-right font-mono text-gray-700"
+                          x-text="(params.min_rise_ratio * 100).toFixed(0) + '%'"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                放量信号需同时满足：跌停家数、涨跌停比、上涨家数占比三道情绪过滤。
+            </div>
+        </div>
+
+        <!-- 板块低位过滤 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">板块低位过滤</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">短窗天数</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="30" step="1"
+                           x-model.number="params.sector_short_lookback"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_short_lookback + '日'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">短窗涨幅</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="50" step="1"
+                           x-model.number="params.sector_short_return_pct"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_short_return_pct + '%'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">长窗天数</label>
+                    <input type="range" class="form-range h-1.5" min="10" max="120" step="5"
+                           x-model.number="params.sector_long_lookback"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_long_lookback + '日'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">长窗涨幅</label>
+                    <input type="range" class="form-range h-1.5" min="5" max="100" step="5"
+                           x-model.number="params.sector_long_return_pct"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_long_return_pct + '%'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">最高连板</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="6" step="1"
+                           x-model.number="params.sector_max_board_level"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_max_board_level + '板'"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                低位条件：短窗涨幅 < 阈值 且 长窗涨幅 < 阈值 且 最高连板 <= 阈值。
+                短窗判断"近期是否急涨"，长窗判断"是否涨了一大波后仅小幅回调"。
+            </div>
+        </div>
+
+        <!-- 概念低位过滤 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">概念低位过滤</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">短窗天数</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="30" step="1"
+                           x-model.number="params.concept_short_lookback"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_short_lookback + '日'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">短窗涨幅</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="50" step="1"
+                           x-model.number="params.concept_short_return_pct"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_short_return_pct + '%'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">长窗天数</label>
+                    <input type="range" class="form-range h-1.5" min="10" max="120" step="5"
+                           x-model.number="params.concept_long_lookback"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_long_lookback + '日'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">长窗涨幅</label>
+                    <input type="range" class="form-range h-1.5" min="5" max="100" step="5"
+                           x-model.number="params.concept_long_return_pct"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_long_return_pct + '%'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">最高连板</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="6" step="1"
+                           x-model.number="params.concept_max_board_level"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_max_board_level + '板'"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                低位条件：短窗涨幅 < 阈值 且 长窗涨幅 < 阈值 且 最高连板 <= 阈值。
+                短窗判断"近期是否急涨"，长窗判断"是否涨了一大波后仅小幅回调"。
+            </div>
+        </div>
+
+        <!-- 龙头股过滤 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">龙头股过滤</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨幅天数</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="30" step="1"
+                           x-model.number="params.stock_gain_days"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.stock_gain_days + '日'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨幅限制</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="50" step="1"
+                           x-model.number="params.stock_gain_limit"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.stock_gain_limit + '%'"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                候选股先过滤近 N 日涨幅超过限制的个股，且仅保留主板股票。
+            </div>
+        </div>
+
+        <!-- 龙头股打分权重 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">龙头股打分权重</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨停强度</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.leader_weights[0]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.leader_weights[0].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">量能强度</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.leader_weights[1]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.leader_weights[1].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">换手健康</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.leader_weights[2]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.leader_weights[2].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">位置安全</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.leader_weights[3]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.leader_weights[3].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">成交量占比</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.amount_weight"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.amount_weight.toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">板块相关</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.sector_relevance_weight"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_relevance_weight.toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">概念相关</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_relevance_weight"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_relevance_weight.toFixed(2)"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                候选股按 5 维加权复合打分（涨停强度、量能强度、换手健康、位置安全、相关性）排序，
+                其中相关性按梯度映射：0.7+/0.6+/0.5+/0.4+/&lt;0.4 分别对应 1.0/0.7/0.5/0.3/0.1。
+                前 4 维权重的和相关性权重会一起归一化。
+                「成交量占比」控制量能分内部：量能分 = 成交量占比×成交量分 + (1-成交量占比)×放量分。
+            </div>
+        </div>
+
+        <!-- 板块打分权重 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">板块打分权重</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨停率</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.sector_weights[0]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_weights[0].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨停数量</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.sector_weights[1]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_weights[1].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">平均涨幅</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.sector_weights[2]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_weights[2].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">人均成交额</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.sector_weights[3]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_weights[3].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">成交额环比</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.sector_weights[4]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.sector_weights[4].toFixed(2)"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 概念打分权重 -->
+        <div class="card p-3">
+            <div class="card-title mb-2 text-xs font-medium text-gray-700">概念打分权重</div>
+            <div class="space-y-1 text-xs">
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨停率</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_weights[0]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_weights[0].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">涨停数量</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_weights[1]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_weights[1].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">平均涨幅</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_weights[2]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_weights[2].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">人均成交额</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_weights[3]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_weights[3].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">成交额环比</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_weights[4]"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_weights[4].toFixed(2)"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">最小涨停</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="10" step="1"
+                           x-model.number="params.concept_min_limit_up"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_min_limit_up + '只'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">最小成分</label>
+                    <input type="range" class="form-range h-1.5" min="1" max="100" step="1"
+                           x-model.number="params.concept_min_stock_count"/>
+                    <span class="w-10 text-right font-mono text-gray-700" x-text="params.concept_min_stock_count + '只'"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="w-20 shrink-0 text-gray-600">亲密度</label>
+                    <input type="range" class="form-range h-1.5" min="0" max="1" step="0.05"
+                           x-model.number="params.concept_similarity_threshold"/>
+                    <span class="w-10 text-right font-mono text-gray-700"
+                          x-text="(params.concept_similarity_threshold * 100).toFixed(0) + '%'"></span>
+                </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                概念「内/跨」判断：两概念共同成分股 / 合并成分股 ≥ 亲密度阈值时视为同一主线内发散。
+            </div>
+        </div>
+
+        <!-- 详情（置于右侧列最上方，点击板块/概念/个股后详情优先显示，参数配置下移） -->
+        <div class="card overflow-hidden min-w-0" style="order: -1;">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">详情</div>
+                    <div class="card-subtitle" x-text="detailSubtitle">点击左侧板块、概念或个股查看详情</div>
+                </div>
+            </div>
+
+            <div x-show="!selected" class="text-gray-500 py-8 text-center text-sm">
+                点击表格中的板块、概念或个股，查看详细指标与走势。
+            </div>
+
+            <div x-show="selected && detailLoading" class="text-gray-500 py-8 text-center text-sm">正在加载详情...</div>
+
+            <div x-show="selected && !detailLoading">
+            <!-- 板块详情 -->
+            <div x-show="selectedType === 'sector'">
+                <div class="mb-3">
+                    <div class="text-sm font-medium" x-text="selectedName"></div>
+                    <div class="text-xs text-gray-500" x-text="selectedDate"></div>
+                </div>
+                <div class="space-y-2 mb-4">
+                    <template x-for="field in ['score','composite_score','rank','composite_rank','phase_desc','member_count']" :key="field">
+                        <div x-show="sectorDetail[field] !== undefined" class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                            <span class="text-gray-600" x-text="fieldName(field)"></span>
+                            <span class="font-mono" x-text="typeof sectorDetail[field] === 'string' ? sectorDetail[field] : fmt(sectorDetail[field])"></span>
+                        </div>
+                    </template>
+                </div>
+                <div class="mb-4">
+                    <div class="text-xs text-gray-600 mb-1">近期排名走势</div>
+                    <div id="sectorRankChart" style="height: 200px; width: 100%;"></div>
+                    <div x-show="selectedType === 'sector' && (!sectorHistory || !sectorHistory.length)" class="text-xs text-gray-400 mt-1">暂无排名数据</div>
+                </div>
+                <div class="mb-4">
+                    <div class="text-xs text-gray-600 mb-1">板块指数走势</div>
+                    <div id="sectorPriceChart" style="height: 200px; width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- 概念详情 -->
+            <div x-show="selectedType === 'concept'">
+                <div class="mb-3">
+                    <div class="text-sm font-medium" x-text="selectedName"></div>
+                    <div class="text-xs text-gray-500" x-text="selectedDate"></div>
+                </div>
+                <div class="space-y-2 mb-4">
+                    <template x-for="field in ['score','composite_score','rank','composite_rank','phase_desc','member_count']" :key="field">
+                        <div x-show="conceptDetail[field] !== undefined" class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                            <span class="text-gray-600" x-text="fieldName(field)"></span>
+                            <span class="font-mono" x-text="typeof conceptDetail[field] === 'string' ? conceptDetail[field] : fmt(conceptDetail[field])"></span>
+                        </div>
+                    </template>
+                </div>
+                <div class="mb-4">
+                    <div class="text-xs text-gray-600 mb-1">近期排名走势</div>
+                    <div id="conceptRankChart" style="height: 200px; width: 100%;"></div>
+                    <div x-show="selectedType === 'concept' && (!conceptHistory || !conceptHistory.length)" class="text-xs text-gray-400 mt-1">暂无排名数据</div>
+                </div>
+                <div class="mb-4">
+                    <div class="text-xs text-gray-600 mb-1">概念指数走势</div>
+                    <div id="conceptPriceChart" style="height: 200px; width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- 个股详情 -->
+            <div x-show="selectedType === 'stock'">
+                <div class="mb-3">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-medium">
+                            <span x-text="stockDetail.info?.name || selectedName"></span>
+                            <span class="text-xs text-gray-500 font-mono ml-1" x-text="stockDetail.code"></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a :href="'/stock-quote?code=' + encodeURIComponent(stockDetail.code)"
+                               target="_blank"
+                               class="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                                个股行情
+                            </a>
+                            <button type="button"
+                                    class="text-xs px-2 py-1 rounded bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors"
+                                    @click="preloadResearchReport()">
+                                研报分析
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500" x-text="selectedDate"></div>
+                </div>
+                <div class="space-y-2 mb-4">
+                    <div class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                        <span class="text-gray-600">行业</span>
+                        <span x-text="stockDetail.info?.sector_2 || '-'"></span>
+                    </div>
+                    <div class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                        <span class="text-gray-600">最新价</span>
+                        <span class="font-mono" x-text="fmt(stockDetail.info?.latest_close)"></span>
+                    </div>
+                    <div class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                        <span class="text-gray-600">涨跌</span>
+                        <span class="font-mono" :class="pnlClass(stockDetail.info?.latest_change_pct)"
+                              x-text="fmtSign(stockDetail.info?.latest_change_pct, 2, '%')"></span>
+                    </div>
+                    <div class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                        <span class="text-gray-600">成交额</span>
+                        <span class="font-mono" x-text="formatAmount(stockDetail.info?.latest_amount)"></span>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <div class="text-xs text-gray-600 mb-1">近 60 日 K 线</div>
+                    <div id="priceChart" style="height: 240px; width: 100%;"></div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-600 mb-1">近期涨停记录</div>
+                    <div class="max-h-[240px] overflow-y-auto space-y-1">
+                        <template x-for="r in stockDetail.limit_up_history" :key="r.date">
+                            <div class="flex justify-between text-xs bg-gray-50 rounded p-2">
+                                <span x-text="r.date"></span>
+                                <span class="font-mono text-red-600" x-text="r.consecutive_days + '板 / ' + fmtSign(r.change_pct, 2, '%')"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+function dragonReviewApp() {
+    return {
+        loading: false,
+        detailLoading: false,
+        days: 5,
+        endDate: '',
+        hasMore: false,
+        rows: [],
+        hasData: false,
+        statusText: '暂无数据',
+        selected: null,
+        selectedType: '',
+        selectedName: '',
+        selectedDate: '',
+        sectorDetail: {},
+        conceptDetail: {},
+        stockDetail: {},
+        sectorHistory: [],
+        conceptHistory: [],
+        params: {
+            volume_ma: 20,
+            volume_ratio_ma: 1.2,
+            volume_ratio_ring: 1.05,
+            max_limit_down: 10,
+            min_up_down_ratio: 3.0,
+            min_rise_ratio: 0.5,
+            sector_short_lookback: 10,
+            sector_short_return_pct: 15,
+            sector_long_lookback: 30,
+            sector_long_return_pct: 30,
+            sector_max_board_level: 3,
+            concept_short_lookback: 10,
+            concept_short_return_pct: 8,
+            concept_long_lookback: 30,
+            concept_long_return_pct: 20,
+            concept_max_board_level: 3,
+            stock_gain_days: 10,
+            stock_gain_limit: 20,
+            concept_similarity_threshold: 0.4,
+            // 板块打分权重 [涨停率, 涨停数量, 平均涨幅, 人均成交额, 成交额环比]
+            sector_weights: [0.30, 0.25, 0.25, 0.10, 0.10],
+            // 概念打分权重 [涨停率, 涨停数量, 平均涨幅, 人均成交额, 成交额环比]
+            concept_weights: [0.30, 0.25, 0.25, 0.10, 0.10],
+            concept_min_limit_up: 2,
+            concept_min_stock_count: 10,
+            // 龙头股前 4 维权重 [涨停强度, 量能强度, 换手健康, 位置安全]，与相关性权重一起归一化
+            leader_weights: [0.45, 0.30, 0.15, 0.10],
+            // 量能分内部：成交量分权重，放量分权重 = 1 - amount_weight
+            amount_weight: 0.6,
+            // 龙头股相关性权重（板块/概念联动程度）
+            sector_relevance_weight: 0.10,
+            concept_relevance_weight: 0.10,
+        },
+
+        _restoreState() {
+            // 参数统一存后端 (多实例共享, 前后端解耦), 前端不再保存数据
+            return App.get('/api/page-settings/dragon_review').then(res => {
+                const state = (res && res.data) || {};
+                if (state.days && [5, 10, 15].includes(Number(state.days))) {
+                    this.days = Number(state.days);
+                }
+                if (state.endDate) this.endDate = state.endDate;
+                if (state.params && typeof state.params === 'object') {
+                    this.params = { ...this.params, ...state.params };
+                }
+            }).catch(e => {
+                console.warn('恢复龙头复盘状态失败:', e);
+            });
+        },
+
+        _saveState() {
+            // 参数统一保存到后端, 多实例共享 (前端不再持有数据)
+            App.post('/api/page-settings/dragon_review', {
+                days: this.days,
+                endDate: this.endDate,
+                params: this.params,
+            }).catch(e => {
+                console.warn('保存龙头复盘状态失败:', e);
+            });
+        },
+
+        async init() {
+            await this._restoreState();
+            this.$watch('days', () => this._saveState());
+            this.$watch('endDate', () => this._saveState());
+            this.$watch('params', () => this._saveState(), { deep: true });
+            if (!this.endDate) {
+                this.endDate = new Date().toISOString().split('T')[0];
+            }
+            await this.loadMatrix();
+            // 支持 URL 参数 ?stock=CODE&date=DATE 自动打开个股详情
+            this._applyUrlParams();
+        },
+
+        _applyUrlParams() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const stockCode = params.get('stock');
+                const stockDate = params.get('date');
+                if (stockCode && stockDate) {
+                    // 异步加载个股信息以获取名称
+                    this._loadStockNameAndSelect(stockCode, stockDate);
+                }
+            } catch (e) {
+                console.warn('解析 URL 参数失败:', e);
+            }
+        },
+
+        async _loadStockNameAndSelect(code, date) {
+            try {
+                const res = await App.get(`/api/dragon-review/stock-detail?code=${encodeURIComponent(code)}&date=${date}`);
+                const name = res.ok && res.info ? (res.info.name || code) : code;
+                this.selectStock(code, name, date);
+            } catch (e) {
+                console.warn('根据 URL 参数加载个股详情失败:', e);
+                this.selectStock(code, code, date);
+            }
+        },
+
+        async loadMatrix() {
+            this.loading = true;
+            try {
+                const p = this.params;
+                const endParam = this.endDate ? `&end_date=${this.endDate}` : '';
+                const res = await App.get(
+                    `/api/dragon-review/matrix?days=${this.days}${endParam}` +
+                    `&ma_days=${p.volume_ma}` +
+                    `&volume_ratio_ma=${p.volume_ratio_ma}` +
+                    `&volume_ratio_ring=${p.volume_ratio_ring}` +
+                    `&max_limit_down=${p.max_limit_down}` +
+                    `&min_up_down_ratio=${p.min_up_down_ratio}` +
+                    `&min_rise_ratio=${p.min_rise_ratio}` +
+                    `&sector_short_lookback=${p.sector_short_lookback}` +
+                    `&sector_short_return_pct=${p.sector_short_return_pct}` +
+                    `&sector_long_lookback=${p.sector_long_lookback}` +
+                    `&sector_long_return_pct=${p.sector_long_return_pct}` +
+                    `&sector_max_board_level=${p.sector_max_board_level}` +
+                    `&concept_short_lookback=${p.concept_short_lookback}` +
+                    `&concept_short_return_pct=${p.concept_short_return_pct}` +
+                    `&concept_long_lookback=${p.concept_long_lookback}` +
+                    `&concept_long_return_pct=${p.concept_long_return_pct}` +
+                    `&concept_max_board_level=${p.concept_max_board_level}` +
+                    `&stock_gain_days=${p.stock_gain_days}` +
+                    `&stock_gain_limit=${p.stock_gain_limit}` +
+                    `&concept_similarity_threshold=${p.concept_similarity_threshold}` +
+                    `&sector_weights=${p.sector_weights.join(',')}` +
+                    `&concept_weights=${p.concept_weights.join(',')}` +
+                    `&concept_min_limit_up=${p.concept_min_limit_up}` +
+                    `&concept_min_stock_count=${p.concept_min_stock_count}` +
+                    `&leader_weights=${p.leader_weights.join(',')}` +
+                    `&amount_weight=${p.amount_weight}` +
+                    `&sector_relevance_weight=${p.sector_relevance_weight}` +
+                    `&concept_relevance_weight=${p.concept_relevance_weight}`
+                );
+                if (!res.ok) {
+                    this.statusText = res.message || '加载失败';
+                    this.hasData = false;
+                    return;
+                }
+                this.rows = res.rows || [];
+                this.hasMore = res.has_more || false;
+                this.hasData = this.rows.length > 0;
+                this.statusText = this.rangeText;
+            } catch (e) {
+                console.error('加载矩阵失败:', e);
+                this.statusText = '加载失败';
+                this.hasData = false;
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        get rangeText() {
+            if (!this.rows.length) return `${this.endDate || '最新'} 往前 ${this.days} 个交易日`;
+            const start = this.rows[this.rows.length - 1].date;
+            const end = this.rows[0].date;
+            return `${start} ~ ${end} 共 ${this.rows.length} 个交易日`;
+        },
+
+        setDays(n) {
+            this.days = n;
+            this.loadMatrix();
+        },
+
+        get detailSubtitle() {
+            if (!this.selected) return '点击左侧板块、概念或个股查看详情';
+            return `${this.selectedName} @ ${this.selectedDate}`;
+        },
+
+        selectSector(name, date) {
+            this.selected = { type: 'sector', name, date };
+            this.selectedType = 'sector';
+            this.selectedName = name;
+            this.selectedDate = date;
+            this.loadSectorDetail(name, date);
+        },
+
+        async loadSectorDetail(name, date) {
+            this.detailLoading = true;
+            try {
+                const [detailRes, indexRes] = await Promise.all([
+                    App.get(`/api/sector-rotation/detail?sector=${encodeURIComponent(name)}&date=${date}`),
+                    App.get(`/api/sector-rotation/sector-index?sector=${encodeURIComponent(name)}&years=2`),
+                ]);
+                this.sectorDetail = detailRes.ok ? detailRes.detail : {};
+                this.sectorHistory = detailRes.ok ? (detailRes.history || []) : [];
+                this.$nextTick(() => {
+                    this.drawRankChart('sectorRankChart', this.sectorHistory, 'rank', 'composite_rank');
+                    this.drawLineChart(indexRes.ok ? indexRes : null, 'sectorPriceChart', '板块指数');
+                    // 延迟 resize，确保容器已完成布局
+                    setTimeout(() => {
+                        this.resizeChart('sectorRankChart');
+                        this.resizeChart('sectorPriceChart');
+                    }, 100);
+                });
+            } catch (e) {
+                console.error('加载板块详情失败:', e);
+                App.toast('加载板块详情失败', 'warn');
+            } finally {
+                this.detailLoading = false;
+            }
+        },
+
+        selectConcept(name, code, date) {
+            if (!code) {
+                App.toast('该概念暂无编码，无法查看详情', 'warn');
+                return;
+            }
+            this.selected = { type: 'concept', name, code, date };
+            this.selectedType = 'concept';
+            this.selectedName = name;
+            this.selectedDate = date;
+            this.loadConceptDetail(name, code, date);
+        },
+
+        async loadConceptDetail(name, code, date) {
+            this.detailLoading = true;
+            try {
+                const [detailRes, indexRes] = await Promise.all([
+                    App.get(`/api/concept-rotation/detail?concept_code=${encodeURIComponent(code)}&date=${date}`),
+                    App.get(`/api/concept-rotation/concept-index?concept_code=${encodeURIComponent(code)}&years=1`),
+                ]);
+                this.conceptDetail = detailRes.ok ? detailRes.detail : {};
+                this.conceptHistory = detailRes.ok ? (detailRes.history || []) : [];
+                this.$nextTick(() => {
+                    this.drawRankChart('conceptRankChart', this.conceptHistory, 'rank', 'composite_rank');
+                    this.drawLineChart(indexRes.ok ? indexRes : null, 'conceptPriceChart', '概念指数');
+                    setTimeout(() => {
+                        this.resizeChart('conceptRankChart');
+                        this.resizeChart('conceptPriceChart');
+                    }, 100);
+                });
+            } catch (e) {
+                console.error('加载概念详情失败:', e);
+                App.toast('加载概念详情失败', 'warn');
+            } finally {
+                this.detailLoading = false;
+            }
+        },
+
+        selectStock(code, name, date) {
+            this.selected = { type: 'stock', code, name, date };
+            this.selectedType = 'stock';
+            this.selectedName = name;
+            this.selectedDate = date;
+            this.loadStockDetail(code, date);
+        },
+
+        // 将研报分析 prompt 注入右侧 AI 输入框（对标模拟盘 AI 分析按钮的 preload 用法）
+        preloadResearchReport() {
+            const code = this.stockDetail.code || this.selected?.code;
+            const name = this.stockDetail.info?.name || this.selectedName || this.selected?.name;
+            if (!code) {
+                App.toast('未获取到股票代码，无法生成研报分析', 'warn');
+                return;
+            }
+            const prompt = `请帮我完成${name}(${code})的研报分析。`;
+            if (typeof AI_CHAT !== 'undefined' && AI_CHAT.preload) {
+                AI_CHAT.preload(prompt);
+                App.toast('研报分析 prompt 已填入 AI 助手输入框', 'success');
+            } else {
+                App.toast('AI 助手未加载，请刷新页面后重试', 'warn');
+            }
+        },
+
+        async loadStockDetail(code, date) {
+            this.detailLoading = true;
+            try {
+                const res = await App.get(`/api/dragon-review/stock-detail?code=${encodeURIComponent(code)}&date=${date}`);
+                if (!res.ok) {
+                    App.toast(res.message || '加载个股详情失败', 'warn');
+                    return;
+                }
+                this.stockDetail = res;
+                this.$nextTick(() => {
+                    this.drawStockKline(res.quote);
+                    setTimeout(() => {
+                        this.resizeChart('priceChart');
+                    }, 100);
+                });
+            } catch (e) {
+                console.error('加载个股详情失败:', e);
+                App.toast('加载个股详情失败', 'warn');
+            } finally {
+                this.detailLoading = false;
+            }
+        },
+
+        drawRankChart(elementId, history, rankField, compositeField) {
+            if (!history || !history.length) {
+                Plotly.purge(elementId);
+                return;
+            }
+            const dates = history.map(h => h.date);
+            const ranks = history.map(h => h[rankField]);
+            const compositeRanks = history.map(h => h[compositeField]);
+            Plotly.newPlot(elementId, [
+                {
+                    x: dates, y: ranks, mode: 'lines+markers', name: '强度排名',
+                    line: { color: '#dc2626', width: 2 }, marker: { size: 4 }, yaxis: 'y'
+                },
+                {
+                    x: dates, y: compositeRanks, mode: 'lines+markers', name: '综合排名',
+                    line: { color: '#2563eb', width: 2, dash: 'dot' }, marker: { size: 4 }, yaxis: 'y'
+                }
+            ], {
+                autosize: true,
+                margin: { t: 10, r: 10, b: 30, l: 30 },
+                xaxis: { tickangle: -30, tickfont: { size: 10 } },
+                yaxis: { autorange: 'reversed', tickfont: { size: 10 } },
+                legend: { orientation: 'h', y: 1.12, x: 0.5, xanchor: 'center' },
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+            }, { responsive: true, displayModeBar: false });
+        },
+
+        drawLineChart(data, elementId, name) {
+            if (!data || !data.dates || !data.dates.length) {
+                Plotly.purge(elementId);
+                return;
+            }
+            const closeKey = data.close !== undefined ? 'close' : 'close_idx';
+            const closes = data[closeKey] || [];
+            Plotly.newPlot(elementId, [{
+                x: data.dates, y: closes, mode: 'lines', name: name,
+                line: { color: '#059669', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(5,150,105,0.08)'
+            }], {
+                autosize: true,
+                margin: { t: 10, r: 10, b: 30, l: 50 },
+                xaxis: { tickangle: -30, tickfont: { size: 10 }, rangeslider: { visible: false } },
+                yaxis: { tickfont: { size: 10 } },
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+            }, { responsive: true, displayModeBar: false });
+        },
+
+        drawStockKline(quote) {
+            if (!quote || !quote.ok || !quote.dates || !quote.dates.length) {
+                Plotly.purge('priceChart');
+                return;
+            }
+            // 取最近 60 根
+            const n = quote.dates.length;
+            const start = Math.max(0, n - 60);
+            const dates = quote.dates.slice(start);
+            const ohlc = quote.ohlc.slice(start);
+            const opens = ohlc.map(x => x[0]);
+            const closes = ohlc.map(x => x[1]);
+            const lows = ohlc.map(x => x[2]);
+            const highs = ohlc.map(x => x[3]);
+            const volumes = (quote.volume || []).slice(start);
+
+            // 均线计算，不足周期返回 null
+            const ma = (arr, len) => arr.map((_, i) => {
+                if (i < len - 1) return null;
+                let s = 0;
+                for (let j = i - len + 1; j <= i; j++) s += arr[j];
+                return Math.round(s / len * 100) / 100;
+            });
+            const ma5 = ma(closes, 5);
+            const ma10 = ma(closes, 10);
+
+            // 日期刻度只保留首、中、尾三个，显示为 YYYY-MM，避免拥挤
+            const fmtMonth = (d) => d ? d.slice(0, 7) : d;
+            const tickVals = dates.length > 2
+                ? [dates[0], dates[Math.floor(dates.length / 2)], dates[dates.length - 1]]
+                : dates;
+            const tickText = tickVals.map(fmtMonth);
+            // 类别轴，每根 K 线等距排列，消除非交易日的日历空隙
+            const xaxisConfig = {
+                type: 'category',
+                tickvals: tickVals,
+                ticktext: tickText,
+                tickangle: 0, tickfont: { size: 9 },
+                rangeslider: { visible: false },
+                showgrid: false
+            };
+
+            // 主图：K 线 + MA5/MA10 趋势线
+            const traces = [
+                {
+                    x: dates, open: opens, high: highs, low: lows, close: closes,
+                    type: 'candlestick', name: 'K线',
+                    increasing: { line: { color: '#ef4444', width: 1 }, fillcolor: '#fecaca' },
+                    decreasing: { line: { color: '#22c55e', width: 1 }, fillcolor: '#bbf7d0' },
+                    xaxis: 'x2', yaxis: 'y'
+                },
+                {
+                    x: dates, y: ma5, type: 'scatter', mode: 'lines',
+                    name: 'MA5', line: { color: '#f59e0b', width: 1.2 }, xaxis: 'x2', yaxis: 'y'
+                },
+                {
+                    x: dates, y: ma10, type: 'scatter', mode: 'lines',
+                    name: 'MA10', line: { color: '#3b82f6', width: 1.2 }, xaxis: 'x2', yaxis: 'y'
+                }
+            ];
+
+            // 底部成交量柱（数据完整时追加）
+            if (volumes && volumes.length === dates.length) {
+                traces.push({
+                    x: dates, y: volumes, type: 'bar', name: '成交量',
+                    marker: { color: volumes.map((v, i) =>
+                        closes[i] >= opens[i] ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)') },
+                    xaxis: 'x', yaxis: 'y2'
+                });
+            }
+
+            Plotly.newPlot('priceChart', traces, {
+                autosize: true,
+                margin: { t: 22, r: 24, b: 30, l: 28 },
+                xaxis: { ...xaxisConfig, anchor: 'y2', domain: [0, 1] },
+                xaxis2: { ...xaxisConfig, anchor: 'y', domain: [0, 1] },
+                yaxis: { domain: [0.28, 1], tickfont: { size: 10 }, showgrid: true, gridcolor: 'rgba(0,0,0,0.06)' },
+                yaxis2: { domain: [0, 0.22], tickfont: { size: 9 }, showgrid: false },
+                legend: { orientation: 'h', y: 1.09, yref: 'paper', x: 0, xanchor: 'left',
+                           font: { size: 6 }, itemwidth: 12, traceorder: 'normal', tracegroupgap: 0 },
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+            }, { responsive: true, displayModeBar: false });
+        },
+
+        resizeChart(elementId) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            try {
+                Plotly.Plots.resize(el);
+            } catch (e) {
+                // 元素尚未初始化或已被 purge，忽略
+            }
+        },
+
+        formatAmount(v) {
+            if (v === null || v === undefined || isNaN(v)) return '-';
+            const n = Number(v);
+            if (n >= 1e12) return (n / 1e12).toFixed(2) + '万亿';
+            if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
+            if (n >= 1e4) return (n / 1e4).toFixed(2) + '万';
+            return n.toFixed(0);
+        },
+
+        formatAmountSmall(v) {
+            if (v === null || v === undefined || isNaN(v)) return '-';
+            const n = Number(v);
+            if (n >= 1e8) return (n / 1e8).toFixed(1) + '亿';
+            if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+            return n.toFixed(0);
+        },
+
+        formatDate(dateStr) {
+            const d = new Date(dateStr);
+            return `${d.getMonth() + 1}/${d.getDate()}`;
+        },
+
+        fmt(v, digits = 2) {
+            if (v === null || v === undefined || isNaN(v)) return '-';
+            return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        },
+
+        fmtSign(v, digits = 2, suffix = '') {
+            if (v === null || v === undefined || isNaN(v)) return '-';
+            const n = Number(v);
+            const sign = n > 0 ? '+' : '';
+            return sign + n.toFixed(digits) + suffix;
+        },
+
+        pnlClass(v) {
+            if (v === null || v === undefined || isNaN(v)) return '';
+            return Number(v) > 0 ? 'pos' : (Number(v) < 0 ? 'neg' : '');
+        },
+
+        fieldName(field) {
+            const map = {
+                score: '强度得分', composite_score: '综合得分', rank: '排名',
+                composite_rank: '综合排名', phase_desc: '轮动象限', member_count: '成份股数'
+            };
+            return map[field] || field;
+        }
+    };
+}
+</script>
+{% endblock %}

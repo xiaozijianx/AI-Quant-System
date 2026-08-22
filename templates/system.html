@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}系统状态 -- AI 量化系统{% endblock %}
+
+{% block content %}
+<div x-data="systemApp()" x-init="init()">
+
+    <button class="help-btn-floating" @click="showHelp = true" title="使用说明">?</button>
+
+    <!-- 使用说明 modal -->
+    <div class="modal-overlay" x-show="showHelp" x-cloak @click.self="showHelp = false">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">系统状态 -- 使用说明</div>
+                <button class="modal-close" @click="showHelp = false">×</button>
+            </div>
+            <div class="modal-body">
+                <h4>这个 Tab 是干嘛的</h4>
+                <p>系统级运维面板, 一眼看出"哪个组件挂了"。还有标准 cron 时点参考。</p>
+
+                <h4>健康检查 7 项</h4>
+                <ul>
+                    <li><b>Python 版本</b> -- 运行环境</li>
+                    <li><b>xtdata 行情</b> -- 是否能拉到 K 线/tick</li>
+                    <li><b>DASHSCOPE_API_KEY</b> -- Charles 投研对话能不能用</li>
+                    <li><b>QMT_PATH</b> -- 实盘下单路径 (默认 dry-run 不需要)</li>
+                    <li><b>live_state.json</b> -- 实盘 state 文件</li>
+                    <li><b>strategy_registry.json</b> -- 策略库</li>
+                    <li><b>历史晨报</b> -- 累积了多少份</li>
+                </ul>
+
+                <h4>定时任务</h4>
+                <p>实盘工作台默认 4 个时点 (周一到周五):</p>
+                <ul>
+                    <li><code>08:30</code> 数据增量（根目录 <code>.env</code> 中 <code>CASE_A_BOARD_DATA_PREP_DIR</code> 下的 <code>run_daily.py</code>）</li>
+                    <li><code>09:00</code> 自动生成并推送投资晨会简报</li>
+                    <li><code>09:30</code> 开盘启动 dry-run 主循环</li>
+                    <li><code>14:55</code> 收盘前 5 分钟停主循环</li>
+                </ul>
+                <p class="text-xs text-gray-500">
+                    实现见 <code>scheduler.py</code>（APScheduler + cron）。
+                    跟 web 分进程跑: <code>python scheduler.py</code>.
+                    每个任务可在下方单独开关, 配置保存在 <code>data/scheduler_config.json</code>。
+                </p>
+
+                <h4>典型场景</h4>
+                <div class="example-block">
+                    <b>场景 1 (排错)</b>: 投研对话不出回复 → 查"DASHSCOPE_API_KEY" 是不是 OK<br/><br/>
+                    <b>场景 2 (上线前自检)</b>: 启动 cron 调度前先点"健康检查", 全 OK 再跑
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- 健康检查 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">健康检查</div>
+                <button class="btn btn-primary btn-sm" @click="check()" :disabled="checking">
+                    <span x-show="!checking">健康检查</span>
+                    <span x-show="checking">检查中...</span>
+                </button>
+            </div>
+            <template x-if="!health || health.length === 0">
+                <div class="text-gray-400 text-sm py-6 text-center">点右上按钮跑一次</div>
+            </template>
+            <template x-if="health && health.length > 0">
+                <table class="app-table">
+                    <thead><tr><th>项</th><th>值</th><th>状态</th></tr></thead>
+                    <tbody>
+                        <template x-for="r in health" :key="r.item">
+                            <tr>
+                                <td x-text="r.item"></td>
+                                <td class="text-xs text-gray-600 font-mono" x-text="r.value"></td>
+                                <td>
+                                    <span class="badge"
+                                          :class="r.status === 'OK' ? 'badge-success' :
+                                                  r.status === 'WARN' ? 'badge-warning' : 'badge-danger'"
+                                          x-text="r.status"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+        </div>
+
+        <!-- 定时任务 cron -->
+        <div class="card" x-data="schedulerApp()" x-init="init()">
+            <div class="card-header">
+                <div class="card-title">定时任务</div>
+                <div class="card-subtitle flex items-center gap-2">
+                    <span>scheduler 状态:</span>
+                    <span class="badge"
+                          :class="heartbeat.online ? 'badge-success' : 'badge-danger'"
+                          x-text="heartbeat.online ? '在线' : '离线'">
+                    </span>
+                    <span x-show="heartbeat.online" class="text-xs text-gray-500">
+                        pid=<span x-text="heartbeat.pid"></span>,
+                        启动 <span x-text="heartbeat.boot_at"></span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- scheduler 进程启停按钮 -->
+            <div class="flex gap-2 mb-4">
+                <button class="btn btn-primary flex-1"
+                        :disabled="heartbeat.online || controlling"
+                        @click="control('start')">
+                    <span x-show="!controlling">启动 scheduler</span>
+                    <span x-show="controlling">处理中...</span>
+                </button>
+                <button class="btn btn-danger flex-1"
+                        :disabled="!heartbeat.online || controlling"
+                        @click="control('stop')">
+                    停止 scheduler
+                </button>
+            </div>
+
+            <table class="app-table">
+                <thead><tr>
+                    <th>时间</th><th>动作</th><th class="text-right">启用</th>
+                </tr></thead>
+                <tbody>
+                    <template x-for="job in jobs" :key="job.id">
+                        <tr>
+                            <td class="num" x-text="job.time"></td>
+                            <td>
+                                <div x-text="job.name"></div>
+                            </td>
+                            <td class="text-right">
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer"
+                                           :checked="job.enabled"
+                                           @change="toggle(job)"
+                                           :disabled="saving">
+                                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none
+                                                peer-focus:ring-2 peer-focus:ring-purple-300
+                                                rounded-full peer peer-checked:after:translate-x-full
+                                                peer-checked:after:border-white after:content-['']
+                                                after:absolute after:top-[2px] after:left-[2px]
+                                                after:bg-white after:border-gray-300 after:border
+                                                after:rounded-full after:h-5 after:w-5
+                                                after:transition-all peer-checked:bg-purple-600"></div>
+                                </label>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div class="text-xs text-gray-500 mt-3 leading-relaxed">
+                <b>配置说明</b>: 开关保存在 <code>data/scheduler_config.json</code>，scheduler 进程在下次触发时自动读取，无需重启。<br/>
+                <b>工作方式</b>: Web (app.py) 与 scheduler 分进程运行，页面崩溃不影响定时任务，scheduler 崩溃也不影响页面。点击上方按钮即可在后台起停 scheduler。
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function systemApp() {
+    return {
+        showHelp: false,
+        health: null,
+        checking: false,
+        // 注意：init 不再自动调 check()，避免 health 接口里的 xtdata 连接阻塞页面首次渲染
+        async init() {},
+        async check() {
+            this.checking = true;
+            try {
+                this.health = await App.get('/api/system/health');
+            } catch (e) {
+                console.error('健康检查失败:', e);
+                this.health = [{item: '健康检查', value: '请求失败: ' + e.message, status: 'ERROR'}];
+            }
+            this.checking = false;
+        },
+    }
+}
+
+function schedulerApp() {
+    return {
+        jobs: [],
+        heartbeat: { online: false },
+        saving: false,
+        controlling: false,
+        async init() {
+            await this.load();
+            // 每 10 秒刷新一次在线状态
+            setInterval(() => this.load(), 10000);
+        },
+        async load() {
+            try {
+                const data = await App.get('/api/system/scheduler/config');
+                this.jobs = data.jobs || [];
+                this.heartbeat = data.heartbeat || { online: false };
+            } catch (e) {
+                console.error('加载调度器配置失败:', e);
+            }
+        },
+        async toggle(job) {
+            this.saving = true;
+            const enabled = !job.enabled;
+            try {
+                const payload = {};
+                payload[job.enabled_by] = enabled;
+                await App.post('/api/system/scheduler/config', payload);
+                job.enabled = enabled;
+            } catch (e) {
+                console.error('保存调度器配置失败:', e);
+                alert('保存失败: ' + e.message);
+            } finally {
+                this.saving = false;
+            }
+        },
+        async control(action) {
+            this.controlling = true;
+            try {
+                const data = await App.post('/api/system/scheduler/control?action=' + action, {});
+                if (data.ok) {
+                    await this.load();
+                } else {
+                    alert('操作失败: ' + (data.error || '未知错误'));
+                }
+            } catch (e) {
+                console.error('scheduler 控制失败:', e);
+                alert('操作失败: ' + e.message);
+            } finally {
+                this.controlling = false;
+            }
+        },
+    }
+}
+</script>
+{% endblock %}

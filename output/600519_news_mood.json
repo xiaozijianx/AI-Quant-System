@@ -1,0 +1,22 @@
+{
+  "overall_sentiment": "中性",
+  "fear_greed_index": 50,
+  "positive_count": 1,
+  "negative_count": 2,
+  "neutral_count": 8,
+  "top_themes": [
+    "大宗交易",
+    "资金流动",
+    "中期分红"
+  ],
+  "risk_alerts": [
+    "食品饮料行业下跌，主力资金净流出",
+    "多只股票特大单净流出，显示资金撤离压力"
+  ],
+  "opportunity_hints": [
+    "多只个股突破半年线，可能形成支撑或趋势",
+    "杠杆资金净买入超亿元，或有短期机会",
+    "贵州多家上市公司推进中期分红，可能吸引投资者关注"
+  ],
+  "summary": "市场情绪整体中性，部分资金流出，但也有积极信号。"
+}

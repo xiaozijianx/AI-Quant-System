@@ -1,0 +1,115 @@
+# MCP 服务器配置 — 对标 Cline mcpSettings.json
+#
+# Phase 22: 让 AI agent 通过 use_mcp_tool / access_mcp_resource 工具
+# 接入 MCP (Model Context Protocol) 服务器生态。
+#
+# 配置格式:
+#   servers:
+#     - name: 服务器唯一标识（agent 调用时使用）
+#       transport: stdio | http
+#       enabled: true | false  （可选，默认 true）
+#       description: 服务器用途说明（会注入 system prompt）
+#
+#       # stdio 传输：spawn 子进程，通过 stdin/stdout JSON-RPC 通信
+#       command: 启动命令（如 npx / python / node）
+#       args: [命令参数列表]
+#       env:  （可选）环境变量，会与系统 env 合并
+#         KEY: value
+#
+#       # http 传输：通过 HTTP POST JSON-RPC 通信
+#       url: http://host:port/path
+#       headers:  （可选）
+#         Authorization: Bearer xxx
+#
+#       # P1-19: 自动批准的工具名列表（对标 Cline autoApprove）
+#       # 列表中的工具调用时跳过用户审批，直接执行。
+#       # 未在列表中的工具按默认审批逻辑处理。
+#       auto_approve:  （可选）
+#         - "read_file"
+#         - "list_directory"
+#
+# 安全约束:
+#   - API keys 必须从系统环境变量读取，使用 ${ENV_VAR} 语法
+#   - 例: api_key: ${MCP_API_KEY}  会读取 os.environ["MCP_API_KEY"]
+#   - 不要在此文件直接硬编码密钥
+#
+# 启用流程:
+#   1. 在 servers 列表中添加服务器配置
+#   2. 重启后端服务（app.py）
+#   3. agent 调用 use_mcp_tool(server_name, tool_name, args) 使用
+#
+# 对标 Cline:
+#   - sdk/packages/core/src/extensions/tools/mcp/use-mcp-tool.ts
+#   - sdk/packages/core/src/extensions/tools/mcp/access-mcp-resource.ts
+
+servers:
+  # Tavily 搜索服务 — 替代已删除的 web_tool.py WebSearchTool
+  # 提供高质量网络搜索能力，agent 通过 use_mcp_tool 调用
+  # 需要：
+  #   1. 在系统环境变量中设置 TAVILY_API_KEY
+  #   2. 免费额度 1000 次/月，注册地址：https://tavily.com
+  #   3. 工具：tavily_search（搜索）、tavily_extract（网页内容提取）、tavily_crawl / tavily_map / tavily_research
+  - name: tavily-search
+    transport: stdio
+    enabled: true
+    description: 网络搜索服务，提供高质量搜索结果。用于搜索新闻、财报、行业信息等。可通过 use_mcp_tool 调用，工具名为 tavily_search。
+    command: npx
+    args:
+      - "-y"
+      - "tavily-mcp@latest"
+    env:
+      TAVILY_API_KEY: "${TAVILY_API_KEY}"
+    auto_approve:
+      - "tavily_search"
+  # 示例 1: 文件系统 MCP（stdio 传输）
+  # - name: filesystem
+  #   transport: stdio
+  #   enabled: true
+  #   description: 提供本地文件系统读写能力
+  #   command: npx
+  #   args:
+  #     - "-y"
+  #     - "@modelcontextprotocol/server-filesystem"
+  #     - "e:/jikeAI/code"
+  #   env: {}
+  #   # P1-19: read_file/list_directory 自动批准，无需用户确认
+  #   auto_approve:
+  #     - "read_file"
+  #     - "list_directory"
+
+  # 示例 2: 自定义 Python MCP 服务器（stdio 传输）
+  # - name: quant-data
+  #   transport: stdio
+  #   enabled: true
+  #   description: 提供量化数据查询能力（股票/财务/板块）
+  #   command: python
+  #   args:
+  #     - "mcp_servers/quant_data_server.py"
+  #   env:
+  #     DB_HOST: ${PG_HOST}
+  #     DB_NAME: ${PG_DB}
+
+  # 示例 3: HTTP 传输的 MCP 服务器
+  # - name: remote-search
+  #   transport: http
+  #   enabled: true
+  #   description: 远程搜索服务
+  #   url: http://localhost:8080/mcp
+  #   headers:
+  #     Authorization: "Bearer ${MCP_SEARCH_TOKEN}"
+
+# Phase 3.8 (Q8): MCP 工具粒度策略 — 对标 Cline policies.ts ToolPolicy
+#   - server: 服务器名（必填）
+#     tool: 工具名（必填）
+#     enabled: true | false  （可选，默认 true；false 表示完全禁用该工具）
+#     auto_approve: true | false  （可选，默认 true；false 表示调用前需用户批准）
+#
+# 示例:
+#   tool_policies:
+#     - server: trading
+#       tool: place_order
+#       auto_approve: false  # 调用前需用户确认
+#     - server: filesystem
+#       tool: delete_file
+#       enabled: false        # 完全禁用
+tool_policies: []

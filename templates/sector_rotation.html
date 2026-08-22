@@ -1,0 +1,572 @@
+{% extends "base.html" %}
+
+{% block title %}板块轮动 - AI 量化交易系统{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">板块轮动</h1>
+        <p class="page-subtitle">最近交易日板块排名热力图，颜色深浅反映板块强度</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-4" x-data="sectorRotationApp()" x-init="init()">
+    <!-- 状态与操作 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">状态</div>
+            <div class="card-subtitle" x-text="statusText"></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- 计算中状态条 -->
+            <template x-if="taskRunning">
+                <div class="flex items-center gap-3 flex-1 min-w-[240px]">
+                    <div class="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                    <div class="flex-1">
+                        <div class="text-sm" x-text="taskMessage"></div>
+                        <div class="h-2 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                            <div class="h-full bg-blue-600 transition-all duration-300"
+                                 :style="`width: ${taskProgressPct}%`"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" @click="stopTask()">停止</button>
+                </div>
+            </template>
+
+            <!-- 日期与区间选择 -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-1">
+                    <span class="text-xs text-gray-500">截止</span>
+                    <input type="date" class="form-input text-xs py-1 px-2" style="width: 130px;"
+                           x-model="endDate" :disabled="taskRunning || loading"/>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button class="btn btn-sm" :class="days === 5 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="taskRunning || loading" @click="setDays(5)">5日</button>
+                    <button class="btn btn-sm" :class="days === 10 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="taskRunning || loading" @click="setDays(10)">10日</button>
+                    <button class="btn btn-sm" :class="days === 20 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="taskRunning || loading" @click="setDays(20)">20日</button>
+                </div>
+                <button class="btn btn-sm btn-primary" :disabled="taskRunning || loading" @click="loadMatrix()">查询</button>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex items-center gap-2">
+                <button class="btn btn-primary" :disabled="taskRunning" @click="refreshToday()">
+                    刷新今日
+                </button>
+                <button class="btn btn-secondary" :disabled="taskRunning" @click="rebuildSelected()">
+                    重建选中区间
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主体：热力图 + 明细 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- 左侧热力图 -->
+        <div class="lg:col-span-2 card">
+            <div class="card-header">
+                <div class="card-title">板块排名热力图</div>
+                <div class="card-subtitle">
+                    行 = 排名位次，列 = 交易日，颜色越深表示板块强度越高
+                </div>
+            </div>
+
+            <div x-show="!hasData && !loading" class="text-gray-500 py-8 text-center">
+                暂无板块轮动数据，请点击“刷新今日”或“重建最近 20 日”开始计算。
+            </div>
+
+            <div x-show="loading" class="text-gray-500 py-8 text-center">
+                正在加载数据...
+            </div>
+
+            <div x-show="hasData" class="overflow-x-auto">
+                <table class="min-w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th class="px-2 py-1 bg-gray-100 sticky left-0 z-10">排名</th>
+                            <template x-for="date in dates" :key="date">
+                                <th class="px-2 py-1 bg-gray-100 text-center min-w-[90px]" x-text="formatDate(date)"></th>
+                            </template>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="rank in ranks" :key="rank">
+                            <tr>
+                                <td class="px-2 py-1 bg-gray-50 font-medium text-center sticky left-0 z-10"
+                                    x-text="rank"></td>
+                                <template x-for="date in dates" :key="date">
+                                    <td>
+                                        <div class="px-1 py-1 text-center cursor-pointer hover:ring-2 hover:ring-blue-400 rounded transition-all"
+                                             :class="{'ring-2 ring-blue-500': isSelected(date, rank)}"
+                                             :style="cellStyle(date, rank)"
+                                             @click="selectCell(date, rank)">
+                                            <div x-text="cellSector(date, rank)"></div>
+                                        </div>
+                                    </td>
+                                </template>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 右侧明细 -->
+        <div class="lg:col-span-1 card">
+            <div class="card-header">
+                <div class="card-title">板块明细</div>
+                <div class="card-subtitle" x-text="detailSubtitle">点击左侧格子查看详情</div>
+            </div>
+
+            <div x-show="!selected" class="text-gray-500 py-8 text-center text-sm">
+                点击左侧热力图中的某个板块，查看该板块当日的详细指标与近期走势。
+            </div>
+
+            <div x-show="selected">
+                <!-- 相关性最高的 5 只股票 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-600 mb-2">相关性最高的股票</div>
+                    <div class="space-y-1.5">
+                        <template x-for="(s, idx) in relevantStocks" :key="s.code">
+                            <div class="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-xs text-gray-400 w-4" x-text="idx + 1"></span>
+                                    <span class="text-xs font-medium truncate" x-text="s.name || s.code"></span>
+                                    <span class="text-[10px] text-gray-500 font-mono" x-text="s.code"></span>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="text-[10px] text-gray-500 font-mono" x-text="'相关 ' + (s.total_score !== null ? s.total_score.toFixed(2) : '-')"></span>
+                                    <button class="btn btn-xs btn-secondary" @click="openStockDetail(s.code, s.name, selected.date)">个股详情</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 核心指标 -->
+                <div class="space-y-3 mb-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">强度得分</span>
+                        <span class="font-mono font-medium" x-text="fmt(detail.score)"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">综合得分</span>
+                        <span class="font-mono font-medium" x-text="fmt(detail.composite_score)"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">排名 / 综合排名</span>
+                        <span class="font-mono font-medium">
+                            <span x-text="detail.rank"></span> / <span x-text="detail.composite_rank"></span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">轮动象限</span>
+                        <span class="badge"
+                              :class="phaseClass(detail.phase)"
+                              x-text="detail.phase_desc || detail.phase"></span>
+                    </div>
+                </div>
+
+                <!-- 历史排名图 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-600 mb-1">近期排名走势</div>
+                    <div id="rankChart" style="height: 240px;"></div>
+                </div>
+
+                <!-- 板块指数走势图 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-600 mb-1">板块指数走势 (近 2 年)</div>
+                    <div id="indexChart" style="height: 240px;"></div>
+                </div>
+
+                <!-- 指标列表 -->
+                <div class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                    <template x-for="field in detailFields" :key="field">
+                        <div class="bg-gray-50 rounded p-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-600" x-text="notes[field]?.name || field"></span>
+                                <span class="font-mono text-xs" x-text="fmt(detail[field])"></span>
+                            </div>
+                            <div class="text-xs text-gray-400 mt-0.5" x-text="notes[field]?.note || ''"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+function sectorRotationApp() {
+    return {
+        loading: false,
+        taskRunning: false,
+        taskMessage: '',
+        taskProgress: 0,
+        taskTotal: 0,
+        dates: [],
+        ranks: [],
+        cells: [],
+        hasData: false,
+        selected: null,
+        detail: null,
+        notes: {},
+        history: [],
+        sectorIndex: null,
+        relevantStocks: [],
+        polling: null,
+        statusText: '暂无数据',
+        days: 20,
+        endDate: '',
+        _restoreState() {
+            // 参数统一存后端 (多实例共享, 前后端解耦), 前端不再保存数据
+            return App.get('/api/page-settings/sector_rotation').then(res => {
+                const state = (res && res.data) || {};
+                if (state.days && [5, 10, 20].includes(Number(state.days))) {
+                    this.days = Number(state.days);
+                }
+                if (state.endDate) this.endDate = state.endDate;
+            }).catch(e => {
+                console.warn('恢复板块轮动状态失败:', e);
+            });
+        },
+
+        _saveState() {
+            // 参数统一保存到后端, 多实例共享 (前端不再持有数据)
+            App.post('/api/page-settings/sector_rotation', {
+                days: this.days,
+                endDate: this.endDate,
+            }).catch(e => {
+                console.warn('保存板块轮动状态失败:', e);
+            });
+        },
+
+        async init() {
+            await this._restoreState();
+            this.$watch('days', () => this._saveState());
+            this.$watch('endDate', () => this._saveState());
+            if (!this.endDate) {
+                this.endDate = new Date().toISOString().split('T')[0];
+            }
+            await this.loadStatus();
+            if (this.taskRunning) {
+                // 如果后台正在计算, 先显示状态条, 等任务完成后再加载矩阵
+                this.startPolling();
+            } else {
+                await this.loadMatrix();
+            }
+        },
+
+        get taskProgressPct() {
+            if (!this.taskTotal) return 0;
+            return Math.round((this.taskProgress / this.taskTotal) * 100);
+        },
+
+        startPolling() {
+            if (this.polling) return;
+            this.polling = setInterval(() => this.loadStatus(), 2000);
+        },
+
+        stopPolling() {
+            if (this.polling) {
+                clearInterval(this.polling);
+                this.polling = null;
+            }
+        },
+
+        async loadStatus() {
+            try {
+                const s = await App.get('/api/sector-rotation/status');
+                const wasRunning = this.taskRunning;
+                this.taskRunning = s.running;
+                this.taskMessage = s.message || '';
+                this.taskProgress = s.progress || 0;
+                this.taskTotal = s.total || 0;
+                this.statusText = s.message || '就绪';
+
+                if (s.running) {
+                    this.startPolling();
+                } else {
+                    this.stopPolling();
+                    // 任务从运行变为结束时, 刷新矩阵
+                    if (wasRunning || this.taskMessage && /(完成|失败|停止)/.test(this.taskMessage)) {
+                        await this.loadMatrix();
+                    }
+                }
+            } catch (e) {
+                console.error('加载状态失败:', e);
+            }
+        },
+
+        async loadMatrix() {
+            this.loading = true;
+            try {
+                const endParam = this.endDate ? `&end_date=${this.endDate}` : '';
+                const res = await App.get(`/api/sector-rotation/matrix?days=${this.days}&top_n=15${endParam}`);
+                this.dates = res.dates || [];
+                this.ranks = res.ranks || [];
+                this.cells = res.cells || [];
+                this.hasData = res.has_data;
+                // 只有没有任务消息时才显示默认提示, 避免覆盖错误信息
+                if (!this.hasData && !this.taskRunning && !this.taskMessage) {
+                    this.statusText = '所选时间段暂无轮动数据，请点击「重建选中区间」生成';
+                } else if (this.hasData) {
+                    const start = this.dates[0];
+                    const end = this.dates[this.dates.length - 1];
+                    this.statusText = `${start} ~ ${end} 共 ${this.dates.length} 个交易日`;
+                }
+            } catch (e) {
+                console.error('加载矩阵失败:', e);
+                if (!this.taskMessage) {
+                    this.statusText = '加载矩阵失败';
+                }
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        setDays(n) {
+            this.days = n;
+            this.loadMatrix();
+        },
+
+        cellIndex(date, rank) {
+            return this.cells.findIndex(c => c.date === date && c.rank === rank);
+        },
+
+        cell(date, rank) {
+            const idx = this.cellIndex(date, rank);
+            return idx >= 0 ? this.cells[idx] : null;
+        },
+
+        cellSector(date, rank) {
+            const c = this.cell(date, rank);
+            return c ? c.sector : '';
+        },
+
+        isSelected(date, rank) {
+            return this.selected && this.selected.date === date && this.selected.rank === rank;
+        },
+
+        cellStyle(date, rank) {
+            const c = this.cell(date, rank);
+            if (!c) return '';
+            const score = c.composite_score !== null ? c.composite_score : c.score;
+            const color = this.scoreColor(score);
+            return `background-color: ${color};`;
+        },
+
+        scoreColor(score) {
+            if (score === null || score === undefined || isNaN(score)) return '#ffffff';
+            // 计算当前所有单元格的 min/max
+            const scores = this.cells
+                .map(c => c.composite_score !== null ? c.composite_score : c.score)
+                .filter(v => v !== null && v !== undefined && !isNaN(v));
+            if (!scores.length) return '#ffffff';
+            const min = Math.min(...scores);
+            const max = Math.max(...scores);
+            if (max === min) return '#ffffff';
+            const ratio = Math.max(0, Math.min(1, (score - min) / (max - min)));
+            // 从白色到深红
+            const r = 255;
+            const g = Math.round(255 - 200 * ratio);
+            const b = Math.round(255 - 200 * ratio);
+            return `rgb(${r}, ${g}, ${b})`;
+        },
+
+        async selectCell(date, rank) {
+            const c = this.cell(date, rank);
+            if (!c) return;
+            this.selected = { date, rank, sector: c.sector };
+            try {
+                const res = await App.get(`/api/sector-rotation/detail?sector=${encodeURIComponent(c.sector)}&date=${date}`);
+                if (!res.ok) {
+                    this.detail = null;
+                    return;
+                }
+                this.detail = res.detail;
+                this.notes = res.notes || {};
+                this.history = res.history || [];
+                this.relevantStocks = res.relevant_stocks || [];
+                // 加载板块指数数据
+                this.sectorIndex = null;
+                const idxRes = await App.get(`/api/sector-rotation/sector-index?sector=${encodeURIComponent(c.sector)}&years=2`);
+                if (idxRes.ok) {
+                    this.sectorIndex = idxRes;
+                }
+                this.$nextTick(() => {
+                    this.drawChart();
+                    this.drawIndexChart();
+                });
+            } catch (e) {
+                console.error('加载明细失败:', e);
+            }
+        },
+
+        get detailSubtitle() {
+            if (!this.selected) return '点击左侧格子查看详情';
+            return `${this.selected.sector} @ ${this.selected.date}`;
+        },
+
+        get detailFields() {
+            if (!this.detail) return [];
+            return [
+                'score', 'composite_score', 'rank', 'composite_rank',
+                'mom21_z', 'rs60_z', 'vol_ratio_z',
+                'roc_20', 'ma20_slope', 'ma20_accel',
+                'macd_hist', 'hist_delta', 'member_count'
+            ].filter(f => this.detail[f] !== undefined);
+        },
+
+        fmt(v) {
+            if (v === null || v === undefined || isNaN(v)) return '-';
+            return Number(v).toLocaleString('zh-CN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        },
+
+        formatDate(dateStr) {
+            const d = new Date(dateStr);
+            return `${d.getMonth() + 1}/${d.getDate()}`;
+        },
+
+        phaseClass(phase) {
+            const map = {
+                'accel_up': 'badge-success',
+                'decel_up': 'badge-warning',
+                'accel_down': 'badge-danger',
+                'decel_down': 'badge-info',
+                'neutral': 'badge-secondary',
+            };
+            return map[phase] || 'badge-secondary';
+        },
+
+        drawChart() {
+            if (!this.history.length) return;
+            const dates = this.history.map(h => h.date);
+            const ranks = this.history.map(h => h.rank);
+            const compositeRanks = this.history.map(h => h.composite_rank);
+
+            Plotly.newPlot('rankChart', [
+                {
+                    x: dates,
+                    y: ranks,
+                    mode: 'lines+markers',
+                    name: '强度排名',
+                    line: { color: '#dc2626', width: 2 },
+                    marker: { size: 4 },
+                    yaxis: 'y',
+                },
+                {
+                    x: dates,
+                    y: compositeRanks,
+                    mode: 'lines+markers',
+                    name: '综合排名',
+                    line: { color: '#2563eb', width: 2, dash: 'dot' },
+                    marker: { size: 4 },
+                    yaxis: 'y',
+                }
+            ], {
+                margin: { t: 10, r: 10, b: 30, l: 30 },
+                xaxis: { tickangle: -30, tickfont: { size: 10 } },
+                yaxis: {
+                    title: '',
+                    autorange: 'reversed',
+                    tickfont: { size: 10 },
+                },
+                legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center' },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+            }, {
+                responsive: true,
+                displayModeBar: false,
+            });
+        },
+
+        drawIndexChart() {
+            if (!this.sectorIndex || !this.sectorIndex.dates.length) return;
+            const dates = this.sectorIndex.dates;
+            const closes = this.sectorIndex.close;
+
+            Plotly.newPlot('indexChart', [
+                {
+                    x: dates,
+                    y: closes,
+                    mode: 'lines',
+                    name: '板块指数',
+                    line: { color: '#059669', width: 2 },
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(5, 150, 105, 0.08)',
+                }
+            ], {
+                margin: { t: 10, r: 10, b: 30, l: 50 },
+                xaxis: {
+                    tickangle: -30,
+                    tickfont: { size: 10 },
+                    rangeslider: { visible: true, thickness: 0.05 },
+                },
+                yaxis: {
+                    title: '',
+                    tickfont: { size: 10 },
+                },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+            }, {
+                responsive: true,
+                displayModeBar: false,
+            });
+        },
+
+        async refreshToday() {
+            try {
+                const res = await App.post('/api/sector-rotation/refresh');
+                if (!res.ok) {
+                    alert(res.error || res.message || '刷新失败');
+                    return;
+                }
+                this.startPolling();
+                await this.loadStatus();
+            } catch (e) {
+                alert('刷新失败: ' + e.message);
+            }
+        },
+
+        async rebuildSelected() {
+            if (!confirm(`确定要重建 ${this.endDate} 往前 ${this.days} 个交易日的板块轮动数据吗？`)) return;
+            try {
+                const endParam = this.endDate ? `&end_date=${this.endDate}` : '';
+                const res = await App.post(`/api/sector-rotation/rebuild?days=${this.days}${endParam}`);
+                if (!res.ok) {
+                    alert(res.error || res.message || '重建失败');
+                    return;
+                }
+                this.startPolling();
+                await this.loadStatus();
+            } catch (e) {
+                alert('重建失败: ' + e.message);
+            }
+        },
+
+        openStockDetail(code, name, date) {
+            const url = `/stock-quote?code=${encodeURIComponent(code)}`;
+            window.open(url, '_blank');
+        },
+
+        async stopTask() {
+            try {
+                await App.post('/api/sector-rotation/stop');
+                this.stopPolling();
+                await this.loadStatus();
+            } catch (e) {
+                alert('停止失败: ' + e.message);
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

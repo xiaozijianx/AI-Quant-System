@@ -1,0 +1,29 @@
+# ---- 敏感信息 ----
+.env
+.env.*
+!.env.example
+agent_config/providers.yaml
+
+# ---- Python 缓存 ----
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 运行时数据 / 大文件 / 第三方 ----
+data/
+agent_data/
+checkpoints/
+third_party/
+*.log
+*.out
+*.err
+server_*.err
+server_*.out
+
+# ---- 运行时状态（可选恢复，不入库） ----
+outputs/live_state.json
+outputs/live_state_real.json
+outputs/live_approvals.json

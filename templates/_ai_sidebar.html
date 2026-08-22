@@ -1,0 +1,45 @@
+{# _ai_sidebar.html -- 右侧 AI 助手侧栏精简版 (复用 AI_CHAT 对象, DOM id 与全屏页一致) #}
+<div class="ai-sidebar-inner">
+    <!-- 头部: 标题 + 操作 -->
+    <div class="ai-sidebar-header">
+        <div class="ai-sidebar-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 2a3 3 0 0 1 3 3v1h1a3 3 0 0 1 3 3v1h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v1a3 3 0 0 1-3 3h-1v1a3 3 0 0 1-3 3 3 3 0 0 1-3-3v-1H8a3 3 0 0 1-3-3v-1H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h1V9a3 3 0 0 1 3-3h1V5a3 3 0 0 1 3-3z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/></svg>
+            <span>AI 助手</span>
+        </div>
+        <div class="ai-sidebar-actions">
+            <a href="/ai-chat" class="ai-sidebar-action" title="打开全屏 AI 助手 (会话管理 / 设置 / 看板)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+            </a>
+            <button class="ai-sidebar-action" id="ai-sidebar-close" title="收起侧栏">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 精简工具行: Provider 切换 + 模式切换 + 新建对话 -->
+    <div class="ai-sidebar-toolbar">
+        <select id="provider-select" class="ai-sidebar-select" title="切换当前会话的大模型 Provider">
+            <option value="">默认 Provider</option>
+        </select>
+        <button id="mode-toggle-btn" class="ai-sidebar-mode-btn" title="切换 Plan/Act 模式">
+            <span class="mode-label" id="mode-label">Act</span>
+        </button>
+        <button id="new-chat-btn" class="ai-sidebar-icon-btn" title="新建对话">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+    </div>
+
+    <!-- 消息区 (id 与全屏页一致, 复用 ai-chat.js 渲染逻辑) -->
+    <div class="chat-messages" id="chat-messages"></div>
+
+    <!-- 输入区 -->
+    <div class="chat-input-area">
+        <div class="chat-input-row">
+            <textarea id="chat-input" placeholder="输入问题, Enter 发送, Shift+Enter 换行..." rows="1"></textarea>
+            <button class="send-btn" id="send-btn" title="发送">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+        </div>
+        <div class="chat-input-hint" id="chat-input-hint">Charles 采用国泰君安五步法分析, 工具调用过程实时展示</div>
+    </div>
+</div>

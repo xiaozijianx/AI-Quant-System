@@ -1,0 +1,23 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 7,
+  "negative_count": 3,
+  "neutral_count": 0,
+  "top_themes": [
+    "核电板块",
+    "电力设备行业",
+    "可控核聚变概念"
+  ],
+  "risk_alerts": [
+    "多只个股短期均线出现死叉",
+    "主力资金连续净流出",
+    "主力资金撤离电力设备板块"
+  ],
+  "opportunity_hints": [
+    "核电及核能相关股票",
+    "光热发电概念",
+    "抽水蓄能概念"
+  ],
+  "summary": "市场整体情绪偏乐观，核电、电力设备等板块表现强劲，但需关注资金流出风险。"
+}
