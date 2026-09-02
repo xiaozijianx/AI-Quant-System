@@ -25,7 +25,10 @@
 body { margin: 0; }
 /* 仅全屏 AI 助手页隐藏滚动条 (侧栏页 body 不加 chat-fullscreen, 不受影响) */
 body.chat-fullscreen { overflow: hidden; }
-body.chat-fullscreen .app-main { height: 100vh; padding: 0 !important; max-width: 100% !important; flex: 1; min-width: 0; overflow: hidden; }
+/* 全屏 AI 助手页: 继承 base.html 后主内容区为 .app-content, 需覆盖其默认 padding/滚动/灰色底
+   (旧版 .app-main 规则保留, 兼容仍使用 .app-main 的裁剪场景) */
+body.chat-fullscreen .app-main,
+body.chat-fullscreen .app-content { height: 100vh; padding: 0 !important; max-width: 100% !important; flex: 1; min-width: 0; overflow: hidden; background: #fff; }
 
 .chat-container { display: flex; height: 100%; overflow: hidden; }
 

@@ -19,7 +19,7 @@
 用法：
     python macro_sentiment.py
     python macro_sentiment.py --mode china
-    python macro_sentiment.py --mode global --output_dir output/
+    python macro_sentiment.py --mode global --output_dir outputs/news/
 """
 
 import argparse

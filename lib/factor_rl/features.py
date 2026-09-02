@@ -113,6 +113,14 @@ FEATURE_NAMES = [name for name, _expr in FEATURE_SPECS]
 # 特征名 -> 本系统表达式 (供 token 解码时替换, 保证 evaluate_expression 可求值)
 FEATURE_EXPRS = {name: expr for name, expr in FEATURE_SPECS}
 
+# 特征名 -> 解码后的完整表达式 (包含与 RL 训练相同的 robust 归一化)
+# FeatureEngine.compute 会对每个特征先求原始表达式, 再统一做 median/MAD robust 归一化。
+# 因此最终入库/评估的表达式必须也用 ts_RobustNorm 包一层, 才能与 RL 训练取值一致。
+FEATURE_DECODE_EXPRS = {
+    name: f"ts_RobustNorm(({expr}), 200)"
+    for name, expr in FEATURE_SPECS
+}
+
 # 基础字段 (保留常量: 恒等叶子, 供需要时直接取面板值; 默认特征集不使用)
 BASE_FIELDS = ["Open", "High", "Low", "Close", "Volume", "Amount", "VWAP",
                "Turnover", "IdioRet", "Value", "TotalRet"]

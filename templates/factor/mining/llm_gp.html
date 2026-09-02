@@ -1,0 +1,392 @@
+  <div x-show="activeTab === 'mining' && miningSubTab === 'llm_gp'" class="space-y-3">
+    <!-- ===== 顶部工具条 ===== -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+        <div class="flex items-center gap-2">
+          <h3 class="text-sm font-semibold text-gray-700">LLM 增强 GP</h3>
+          <span class="hidden sm:inline text-[11px] text-gray-400">LLM基因注入 + 分岛进化 + 低相关筛选</span>
+        </div>
+
+        <div>
+          <label class="block text-[11px] text-gray-500 mb-0.5">股票池</label>
+          <div class="flex items-center gap-1.5">
+            <select x-model="poolType" @change="onPoolTypeChange()" class="w-36 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <option value="active">成交活跃股(自动)</option>
+            <option value="industry">申万行业</option>
+            <option value="sector">板块</option>
+            <option value="concept">概念</option>
+            <option value="index">常见指数</option>
+            <option value="custom">自定义</option>
+            </select>
+            <template x-if="poolType !== 'active' && poolType !== 'custom'">
+            <select x-model="poolRef" class="w-44 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <option value="">请选择</option>
+            <template x-for="opt in poolOptions" :key="opt.value">
+            <option :value="opt.value" x-text="opt.label"></option>
+            </template>
+            </select>
+            </template>
+            <template x-if="poolType === 'custom'">
+            <input type="text" x-model="poolRef" placeholder="逗号分隔代码, 如 600519.SH" class="w-44 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            </template>
+            <template x-if="poolType === 'active'">
+            <input type="text" disabled value="自动选取成交活跃股" class="w-44 h-7 px-2 text-xs border border-gray-200 rounded-md bg-gray-50 text-gray-500">
+            </template>
+          </div>
+        </div>
+
+        <div class="flex items-end gap-2">
+          <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">岛屿数</label>
+            <input type="number" x-model.number="llmGpNIslands" min="1" max="8" class="w-16 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">每岛种群</label>
+            <input type="number" x-model.number="llmGpIslandPop" min="20" max="200" class="w-20 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">代数</label>
+            <input type="number" x-model.number="llmGpGenerations" min="3" max="100" class="w-20 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">最大深度</label>
+            <input type="number" x-model.number="llmGpMaxDepth" min="2" max="6" class="w-16 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+        </div>
+
+        <div class="flex-1 flex justify-end items-center gap-3">
+          <span x-show="mining && llmGpProgress" class="text-xs text-blue-600">岛 <b x-text="(llmGpProgress?.island_idx || 0) + 1"></b>/<b x-text="llmGpProgress?.n_islands || 0"></b> · 第 <b x-text="llmGpProgress?.gen"></b>/<b x-text="llmGpProgress?.generations"></b> 代 · 最优 <b x-text="fmtNum(llmGpProgress?.best_fitness)"></b></span>
+          <button @click="runLlmGp()" :disabled="mining"
+                  :class="mining ? 'opacity-50 cursor-not-allowed' : ''"
+                  class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition-colors"
+                  x-text="mining ? '挖掘中...' : '运行 LLM增强GP'"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 主体: 左结果 / 右参数 ===== -->
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-3 items-start">
+      <!-- 左: 结果区 -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 min-w-0">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-gray-700">LLM 增强 GP 结果</h3>
+          <span class="text-[11px] text-gray-400">使用股票池: <span x-text="poolLabel()"></span></span>
+        </div>
+
+        <div class="text-xs text-gray-500 mb-2" x-show="mining && llmGpProgress">
+          岛<span x-text="(llmGpProgress?.island_idx || 0) + 1"></span>/<span x-text="llmGpProgress?.n_islands || 0"></span>:
+          第 <span x-text="llmGpProgress?.gen"></span>/<span x-text="llmGpProgress?.generations"></span> 代,
+          最优适应度: <span x-text="fmtNum(llmGpProgress?.best_fitness)"></span>,
+          平均适应度: <span x-text="fmtNum(llmGpProgress?.avg_fitness)"></span>
+        </div>
+        <div x-show="mining && llmGpGeneLog && llmGpGeneLog.length" class="text-xs text-emerald-600 mb-2">
+          最近LLM基因: <span x-text="llmGpGeneLog[llmGpGeneLog.length-1]"></span>
+        </div>
+
+        <div x-show="llmGpResult || (mining && llmGpLiveByIsland && Object.keys(llmGpLiveByIsland).length)" class="space-y-3">
+          <div id="llmgp-evolution-chart" style="height: 300px;"></div>
+
+          <!-- LLM 基因注入日志 -->
+          <div x-show="(llmGpResult?.gene_rounds || []).length" class="border rounded p-2">
+            <div class="text-xs text-gray-500 mb-1 font-medium">LLM 基因注入日志（四支柱①③）</div>
+            <template x-for="(g, gi) in (llmGpResult?.gene_rounds || [])" :key="gi">
+              <div class="mb-2">
+                <div class="text-xs text-gray-600">
+                  <span class="font-semibold">第 <span x-text="g.round"></span> 轮</span>
+                  (<span x-text="g.tag === 'init' ? '进化前注入' : '周期注入'"></span>):
+                  通过 <span class="text-emerald-600" x-text="g.accepted"></span> 个,
+                  拒绝 <span class="text-red-400" x-text="g.rejected"></span> 个
+                </div>
+                <template x-for="(gene, ii) in (g.genes || [])" :key="ii">
+                  <div class="truncate pl-2 text-xs">
+                    <span class="text-blue-600" x-text="gene.category"></span>:
+                    <span class="font-mono" x-text="gene.expr"></span>
+                    <span class="text-gray-400" x-text="gene.logic ? ' — ' + gene.logic : ''"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- 岛间迁移日志 -->
+          <template x-if="(llmGpResult?.migration_events || []).length">
+            <div class="border rounded p-2">
+              <div class="text-xs text-gray-500 mb-1 font-medium">岛间迁移日志（四支柱②）</div>
+              <div class="max-h-28 overflow-y-auto text-xs">
+                <template x-for="(m, mi) in (llmGpResult?.migration_events || [])" :key="mi">
+                  <div class="border-b py-1 truncate">
+                    第 <span x-text="m.gen"></span> 代
+                    (<span x-text="m.topology"></span>):
+                    岛<span x-text="m.from_island + 1"></span> → 岛<span x-text="m.to_island + 1"></span>,
+                    迁移 <span x-text="m.count"></span> 个
+                    <span class="text-gray-400" x-text="(m.exprs || []).join(' | ')"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- 候选结果区 -->
+          <div x-show="llmGpResult" class="space-y-3">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-2 py-1 text-left w-8"><input type="checkbox" @change="llmGpToggleAll($event.target.checked)"></th>
+                    <th class="px-2 py-1 text-left">表达式</th>
+                    <th class="px-2 py-1 text-center">评价方式</th>
+                    <th class="px-2 py-1 text-right">RankIC</th>
+                    <th class="px-2 py-1 text-right">ICIR</th>
+                    <th class="px-2 py-1 text-right">Test RankIC</th>
+                    <th class="px-2 py-1 text-right">分层多空</th>
+                    <th class="px-2 py-1 text-right">方向</th>
+                    <th class="px-2 py-1 text-center">OOS</th>
+                    <th class="px-2 py-1 text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(c, i) in (llmGpResult?.candidates || [])" :key="i">
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="px-2 py-1"><input type="checkbox" :checked="llmGpSelected.includes(i)" @change="llmGpToggle(i)"></td>
+                      <td class="px-2 py-1 font-mono text-xs max-w-[300px] truncate" :title="c.expr" x-text="c.expr"></td>
+                      <td class="px-2 py-1 text-center">
+                        <span class="px-1.5 py-0.5 rounded text-[10px]"
+                              :class="evalTypeStyle(gpExprEvalType(c.expr))"
+                              x-text="evalTypeText(gpExprEvalType(c.expr))"></span>
+                      </td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(c.rank_ic_mean)"></td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(c.rank_ic_ir)"></td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(c.test_rank_ic)"></td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(c.layered?.long_short)"></td>
+                      <td class="px-2 py-1 text-right" x-text="c.direction === -1 ? '反向' : '正向'"></td>
+                      <td class="px-2 py-1 text-center">
+                        <span x-show="c.oos_ok" class="text-green-600 text-xs">OK</span>
+                        <span x-show="!c.oos_ok" class="text-red-400 text-xs">FAIL</span>
+                      </td>
+                      <td class="px-2 py-1 text-center">
+                        <button @click="llmGpSaveFactor(c)" class="text-blue-600 hover:underline text-xs">入库</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex justify-between items-center pt-2">
+              <span class="text-xs text-gray-500" x-text="`已选 ${llmGpSelected.length} 个候选`"></span>
+              <div class="flex items-center gap-2">
+                <button @click="llmGpBatchSaveAndSynth()" :disabled="llmGpSelected.length === 0"
+                        class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">批量入库并进多因子</button>
+                <button @click="llmGpBatchSave()" :disabled="llmGpSelected.length === 0"
+                        class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">批量入库</button>
+              </div>
+            </div>
+
+            <!-- 去冗余报告 -->
+            <div x-show="llmGpResult?.dedup_report?.enabled" class="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-500">
+              <div>低相关筛选: 阈值 |corr|&lt;<span x-text="llmGpResult?.dedup_report?.corr_thresh"></span>, 保留 <span x-text="llmGpResult?.dedup_report?.kept_n"></span> 个, 剔除 <span x-text="llmGpResult?.dedup_report?.removed_n"></span> 个高度相关候选</div>
+              <template x-if="(llmGpResult?.dedup_report?.removed || []).length > 0">
+                <div class="mt-1 max-h-24 overflow-y-auto">
+                  <template x-for="(r, ri) in (llmGpResult?.dedup_report?.removed || []).slice(0, 10)" :key="ri">
+                    <div class="truncate">
+                      剔除 <span class="font-mono" x-text="r.expr"></span>
+                      (与 <span class="font-mono" x-text="r.corr_with"></span> corr=<span x-text="r.corr"></span>)
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <!-- 各代曲线数据 -->
+            <div class="text-xs text-gray-400 mt-2" x-show="llmGpResult?.evolution_curve?.length">
+              进化: <span x-text="llmGpResult?.generations"></span> 代 / <span x-text="llmGpResult?.n_islands"></span> 岛,
+              最优适应度: <span x-text="fmtNum(llmGpResult?.best_fitness)"></span>,
+              表达式: <span class="font-mono" x-text="llmGpResult?.best_expr"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右: 参数面板 -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 lg:sticky lg:top-2">
+        <h3 class="text-sm font-semibold text-gray-700 mb-2">参数配置</h3>
+        <div class="space-y-2">
+
+          <!-- LLM 大模型配置 -->
+          <details class="rounded-lg border border-gray-100 p-2">
+            <summary class="text-[11px] font-medium text-gray-500 cursor-pointer">LLM 大模型配置</summary>
+            <div class="mt-2 space-y-1.5">
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">API Key</label>
+                <input type="password" x-model="llmGpCfg.api_key" placeholder="sk-..." class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">Base URL</label>
+                <input type="text" x-model="llmGpCfg.base_url" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">模型</label>
+                <input type="text" x-model="llmGpCfg.model" placeholder="qwen-plus" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div class="grid grid-cols-2 gap-x-2">
+                <div>
+                  <label class="block text-[11px] text-gray-500 mb-0.5">Temperature</label>
+                  <input type="number" x-model.number="llmGpCfg.temperature" min="0" max="2" step="0.1" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-500 mb-0.5">Max Tokens</label>
+                  <input type="number" x-model.number="llmGpCfg.max_tokens" min="256" max="8192" step="256" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                </div>
+              </div>
+              <div class="flex gap-1.5 pt-0.5">
+                <button @click="saveLlmGpConfig()" class="px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700">保存配置</button>
+                <button @click="loadLlmGpConfig()" class="px-3 py-1 text-xs bg-white text-gray-600 border rounded hover:bg-gray-50">刷新</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- 训练与数据 -->
+          <div class="rounded-lg border border-gray-100 p-2">
+            <div class="text-[11px] font-medium text-gray-500 mb-1">训练与数据</div>
+            <div class="grid grid-cols-4 gap-x-1.5 gap-y-2">
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">持有期</label>
+                <input type="number" x-model.number="llmGpRebalPeriod" min="3" max="63" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">TS窗口</label>
+                <input type="number" x-model.number="llmGpTsNormWindow" min="0" max="500" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">训练比例</label>
+                <input type="number" x-model.number="llmGpTrainRatio" min="0.5" max="0.9" step="0.05" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">并行进程</label>
+                <input type="number" x-model.number="llmGpNJobs" min="1" max="16" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+            </div>
+            <div class="mt-1">
+              <label class="block text-[11px] text-gray-500 mb-0.5">搜索空间</label>
+              <select x-model="llmGpSpaceLevel" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                <option value="L0">L0 基础算子+字段</option>
+                <option value="L1">L1 新时序算子</option>
+                <option value="L2">L2 算子+基类</option>
+              </select>
+            </div>
+            <div class="mt-1 grid grid-cols-2 gap-x-2">
+              <label class="flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+                启用TS标准化
+                <input type="checkbox" x-model="llmGpUseTsNorm" class="h-4 w-4 rounded accent-blue-600">
+              </label>
+              <label class="flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+                市值中性化
+                <input type="checkbox" x-model="llmGpMarketcapNeutralize" class="h-4 w-4 rounded accent-blue-600">
+              </label>
+              <label class="flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+                启用GPU加速
+                <input type="checkbox" x-model="llmGpUseGpu" class="h-4 w-4 rounded accent-blue-600">
+              </label>
+              <label class="flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+                岛间并行
+                <input type="checkbox" x-model="llmGpIslandParallel" class="h-4 w-4 rounded accent-blue-600">
+              </label>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1">岛间并行默认开启 · GPU需CUDA · TS窗口0=关闭</div>
+          </div>
+
+          <!-- LLM注入与迁移 -->
+          <div class="rounded-lg border border-gray-100 p-2">
+            <div class="text-[11px] font-medium text-gray-500 mb-1">LLM注入与迁移</div>
+            <div class="grid grid-cols-4 gap-x-1.5 gap-y-2">
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">注入间隔</label>
+                <input type="number" x-model.number="llmGpInjectInterval" min="1" max="50" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">每次基因</label>
+                <input type="number" x-model.number="llmGpGenesPerInject" min="1" max="30" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">最大轮次</label>
+                <input type="number" x-model.number="llmGpMaxInjectRounds" min="0" max="10" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">迁移间隔</label>
+                <input type="number" x-model.number="llmGpMigInterval" min="1" max="50" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">迁移数量</label>
+                <input type="number" x-model.number="llmGpMigCount" min="1" max="20" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div class="col-span-2">
+                <label class="block text-[11px] text-gray-500 mb-0.5">迁移拓扑</label>
+                <select x-model="llmGpMigTopology" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <option value="ring">环形</option>
+                  <option value="random">随机</option>
+                  <option value="all_to_best">全部迁往最优岛</option>
+                </select>
+              </div>
+            </div>
+            <label class="mt-1 flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+              LLM基因注入
+              <input type="checkbox" x-model="llmGpGeneEnabled" class="h-4 w-4 rounded accent-blue-600">
+            </label>
+          </div>
+
+          <!-- 遗传算子 -->
+          <div class="rounded-lg border border-gray-100 p-2">
+            <div class="text-[11px] font-medium text-gray-500 mb-1">遗传算子</div>
+            <div class="grid grid-cols-4 gap-x-1.5 gap-y-2">
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">锦标赛</label>
+                <input type="number" x-model.number="llmGpTournamentSize" min="2" max="20" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">交叉</label>
+                <input type="number" x-model.number="llmGpPCrossover" min="0.5" max="1.0" step="0.05" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">子树变异</label>
+                <input type="number" x-model.number="llmGpPSubtreeMut" min="0" max="0.1" step="0.005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">提升变异</label>
+                <input type="number" x-model.number="llmGpPHoistMut" min="0" max="0.1" step="0.005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">点变异</label>
+                <input type="number" x-model.number="llmGpPPointMut" min="0" max="0.1" step="0.005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-500 mb-0.5">复杂度惩罚</label>
+                <input type="number" x-model.number="llmGpParsimony" min="0" max="0.01" step="0.0005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </div>
+            </div>
+          </div>
+
+          <!-- 筛选 -->
+          <div class="rounded-lg border border-gray-100 p-2">
+            <div class="text-[11px] font-medium text-gray-500 mb-1">筛选</div>
+            <div>
+              <label class="block text-[11px] text-gray-500 mb-0.5">去冗余阈值</label>
+              <input type="number" x-model.number="llmGpCorrThresh" min="0" max="1" step="0.05" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              <div class="text-[10px] text-gray-400">东吴口径 0.70</div>
+            </div>
+            <div class="mt-1 grid grid-cols-2 gap-x-2">
+              <label class="flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+                Warm-Start
+                <input type="checkbox" x-model="llmGpUseWarmStart" class="h-4 w-4 rounded accent-blue-600">
+              </label>
+              <label class="flex items-center justify-between text-[11px] text-gray-600 py-0.5">
+                过滤裸字段
+                <input type="checkbox" x-model="llmGpFilterBare" class="h-4 w-4 rounded accent-blue-600">
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SVD 独立分析 (挖掘页内层子Tab) ==================== -->

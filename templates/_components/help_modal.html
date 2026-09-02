@@ -1,0 +1,17 @@
+{# 帮助弹窗统一组件: 各页面通过 include 引入 #}
+{# 调用方在 include 前设置: #}
+{#   {% set help_title = '页面名' %}                      #}
+{#   {% set help_max_width = '680px' %}   (可选, 缺省默认宽度) #}
+{#   {% set help_content_html %} 文案 HTML {% endset %}    #}
+{#   再 {% include "_components/help_modal.html" %}       #}
+<div class="modal-overlay" x-show="showHelp" x-cloak @click.self="showHelp = false">
+    <div class="modal-card"{% if help_max_width %} style="max-width:{{ help_max_width }};"{% endif %}>
+        <div class="modal-header">
+            <div class="modal-title">{{ help_title }} -- 使用说明</div>
+            <button class="modal-close" @click="showHelp = false">×</button>
+        </div>
+        <div class="modal-body">
+            {{ help_content_html }}
+        </div>
+    </div>
+</div>

@@ -537,7 +537,7 @@ class LiveSimRunner:
 
         from lib.paths import setup_sys_path
         setup_sys_path()
-        from live_trading.live_loop import LiveTradingLoop
+        from services.live.trading.live_loop import LiveTradingLoop
         from lib.strategy_registry import StrategyRouter
 
         cfg = load_mock_config(self._mock_config_file)

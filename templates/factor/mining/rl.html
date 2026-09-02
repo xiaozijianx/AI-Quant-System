@@ -1,0 +1,261 @@
+
+  <!-- ==================== RL 强化学习因子挖掘 (阶段6.1, 独立引擎, 深度复刻 AlphaMaster) ==================== -->
+  <div x-show="activeTab === 'mining' && miningSubTab === 'rl'" class="space-y-4">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <!-- 顶栏: 标题 + 运行控制 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <h3 class="text-sm font-semibold text-gray-700">RL 强化学习因子挖掘</h3>
+          <span class="text-[11px] text-gray-400">深度复刻 AlphaMaster</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span x-show="rlMining" class="text-xs text-blue-600">训练中 ... 步 <b x-text="rlProgress?.step ?? 0"></b>/<b x-text="rlProgress?.train_steps ?? 0"></b></span>
+          <span class="text-[11px] text-gray-400">股票池: <span x-text="poolLabel()"></span></span>
+          <button @click="rlShowAdvanced = !rlShowAdvanced"
+                  class="px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-50 text-gray-600 transition-colors"
+                  x-text="rlShowAdvanced ? '收起高级参数 ▲' : '展开高级参数 ▼'"></button>
+          <button @click="runRl()" :disabled="rlMining"
+                  :class="rlMining ? 'opacity-50 cursor-not-allowed' : ''"
+                  class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition-colors">运行 RL 挖掘</button>
+        </div>
+      </div>
+
+      <!-- 基本参数: 常用项 -->
+      <div class="grid grid-cols-12 gap-x-2 gap-y-2.5 px-4 py-3">
+        <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+          <label class="block text-[11px] text-gray-500 mb-0.5">训练步数</label>
+          <input type="number" x-model.number="rlTrainSteps" min="50" max="10000" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+          <label class="block text-[11px] text-gray-500 mb-0.5">每步采样数</label>
+          <input type="number" x-model.number="rlBatchSize" min="16" max="512" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div class="col-span-6 sm:col-span-3 lg:col-span-2 flex flex-col justify-end gap-1.5">
+          <label class="flex items-center gap-1.5 text-[11px] text-gray-500">
+            <input type="checkbox" x-model="rlUseGpu" class="h-4 w-4 rounded accent-blue-600">启用GPU求值
+          </label>
+          <label class="flex items-center gap-1.5 text-[11px] text-gray-500">
+            <input type="checkbox" x-model="rlResume" class="h-4 w-4 rounded accent-blue-600">断点续训
+          </label>
+        </div>
+        <div class="col-span-12 sm:col-span-6 lg:col-span-6 flex items-end gap-1.5">
+          <div class="flex-1">
+            <label class="block text-[11px] text-gray-500 mb-0.5">股票池</label>
+            <select x-model="poolType" @change="onPoolTypeChange()" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              <option value="active">成交活跃股(自动80只)</option>
+              <option value="industry">申万行业</option>
+              <option value="sector">板块</option>
+              <option value="concept">概念</option>
+              <option value="index">常见指数</option>
+              <option value="custom">自定义</option>
+              <option value="single">单股</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="block text-[11px] text-gray-500 mb-0.5" x-text="poolLabel()"></label>
+            <template x-if="poolType === 'industry' || poolType === 'sector' || poolType === 'concept' || poolType === 'index'">
+              <select x-model="poolRef" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                <option value="">请选择</option>
+                <template x-for="opt in poolOptions" :key="opt.value">
+                  <option :value="opt.value" x-text="opt.label"></option>
+                </template>
+              </select>
+            </template>
+            <template x-if="poolType === 'custom' || poolType === 'single'">
+              <input type="text" x-model="poolRef"
+                     :placeholder="poolType === 'single' ? '如 600519.SH' : '逗号分隔代码'"
+                     class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            </template>
+            <template x-if="poolType === 'active'">
+              <input type="text" x-model="stockPoolInput" @keydown.enter="addStock()"
+                     placeholder="追加代码回车" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            </template>
+          </div>
+        </div>
+        <div x-show="poolType === 'active'" class="col-span-12">
+          <div class="flex flex-wrap gap-1">
+            <template x-for="code in stockCodes" :key="code">
+              <span class="px-2 py-0.5 text-xs bg-gray-100 rounded flex items-center gap-1">
+                <span x-text="code"></span>
+                <button @click="stockCodes = stockCodes.filter(c => c !== code)" class="text-red-500">×</button>
+              </span>
+            </template>
+            <button @click="loadDefaultPool()" class="text-xs text-blue-600 hover:underline">载入默认池</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 高级参数 (折叠) -->
+      <div x-show="rlShowAdvanced" class="border-t border-gray-100 px-4 py-3 bg-gray-50/50">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-[11px] font-medium text-gray-500">高级参数</span>
+          <span class="text-[11px] text-gray-400">训练结构、奖励权重、重启与 WF 等</span>
+        </div>
+        <div class="grid grid-cols-12 gap-x-3 gap-y-3">
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">公式长度上限</label>
+            <input type="number" x-model.number="rlMaxLen" min="4" max="16" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">学习率</label>
+            <input type="number" x-model.number="rlLr" min="0.0001" max="0.01" step="0.0001" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">熵系数上限</label>
+            <input type="number" x-model.number="rlEntropyMax" min="0.1" max="2.0" step="0.1" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">持有期(日)</label>
+            <input type="number" x-model.number="rlRebalPeriod" min="3" max="63" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">精英池大小</label>
+            <input type="number" x-model.number="rlEliteSize" min="10" max="200" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">精英回放比例</label>
+            <input type="number" x-model.number="rlEliteFrac" min="0" max="0.5" step="0.05" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">最大重启次数</label>
+            <input type="number" x-model.number="rlMaxRestarts" min="0" max="100" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">重启噪声</label>
+            <input type="number" x-model.number="rlRestartNoise" min="0.05" max="1.0" step="0.05" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">IC权重</label>
+            <input type="number" x-model.number="rlIcWeight" min="0" max="5" step="0.1" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">IR权重</label>
+            <input type="number" x-model.number="rlIrWeight" min="0" max="2" step="0.1" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">分层权重</label>
+            <input type="number" x-model.number="rlLayeredWeight" min="0" max="2" step="0.1" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">复杂度惩罚</label>
+            <input type="number" x-model.number="rlParsimony" min="0" max="0.01" step="0.0005" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">去冗余阈值</label>
+            <input type="number" x-model.number="rlCorrThresh" min="0" max="1" step="0.05" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">返回候选数</label>
+            <input type="number" x-model.number="rlReturnCandidates" min="1" max="50" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3 flex items-end">
+            <label class="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <input type="checkbox" x-model="rlUseLord" class="h-4 w-4 rounded accent-blue-600">LoRD正则
+            </label>
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">训练比例</label>
+            <input type="number" x-model.number="rlTrainRatio" min="0.5" max="0.9" step="0.05" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">验证比例</label>
+            <input type="number" x-model.number="rlValRatio" min="0" max="0.3" step="0.05" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">随机种子</label>
+            <input type="number" x-model.number="rlRandomState" min="0" max="9999" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">岛屿数</label>
+            <input type="number" x-model.number="rlNIslands" min="1" max="8" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <div class="text-[10px] text-gray-400">&gt;1 启用多起点精英迁移</div>
+          </div>
+          <div x-show="rlNIslands > 1" class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">迁移间隔步</label>
+            <input type="number" x-model.number="rlMigInterval" min="10" max="1000" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">WF折数</label>
+            <input type="number" x-model.number="rlNFolds" min="0" max="10" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <div class="text-[10px] text-gray-400">0=关闭</div>
+          </div>
+          <div class="col-span-6 sm:col-span-4 lg:col-span-3">
+            <label class="block text-[11px] text-gray-500 mb-0.5">置换检验次数</label>
+            <input type="number" x-model.number="rlPermN" min="0" max="1000" step="50" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <div class="text-[10px] text-gray-400">0=关闭</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 训练曲线 + 重启日志 -->
+    <div x-show="rlResult || (rlMining && rlLiveCurve && rlLiveCurve.length)" class="space-y-3">
+      <div class="bg-white rounded-lg p-4 shadow-sm">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">训练曲线</h3>
+        <div id="rl-training-chart" style="height: 280px;"></div>
+        <div class="text-xs text-gray-400 mt-2" x-show="rlResult">
+          最优得分: <span x-text="fmtNum(rlResult?.best_score)"></span>,
+          精英池: <span x-text="rlResult?.elite_pool_size"></span>,
+          重启次数: <span x-text="rlResult?.restart_count"></span>,
+          股票数: <span x-text="rlResult?.n_stocks"></span>,
+          日期数: <span x-text="rlResult?.n_dates"></span>
+        </div>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow-sm" x-show="rlRestartLog.length">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">熵坍塌重启日志</h3>
+        <div class="space-y-1 max-h-32 overflow-y-auto text-xs">
+          <template x-for="(r, i) in rlRestartLog" :key="i">
+            <div class="text-gray-600">步 <span x-text="r.step"></span>: 重启 #<span x-text="r.restart_count"></span>, 噪声=<span x-text="fmtNum(r.noise)"></span>, 熵=<span x-text="fmtNum(r.entropy)"></span></div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 候选结果表 -->
+    <div x-show="rlResult?.candidates?.length" class="bg-white rounded-lg p-4 shadow-sm">
+      <h3 class="text-sm font-semibold mb-2 text-gray-700">候选因子</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 pr-2">表达式</th>
+              <th class="py-1 pr-2">RankIC</th>
+              <th class="py-1 pr-2">ICIR</th>
+              <th class="py-1 pr-2">方向</th>
+              <th class="py-1 pr-2">OOS</th>
+              <th class="py-1 pr-2">WF</th>
+              <th class="py-1 pr-2">显著性</th>
+              <th class="py-1 pr-2">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(c, i) in (rlResult?.candidates || [])" :key="i">
+              <tr class="border-b hover:bg-gray-50">
+                <td class="py-1 pr-2 font-mono max-w-[320px] truncate" :title="c.expr" x-text="c.expr"></td>
+                <td class="py-1 pr-2" x-text="fmtNum(c.rank_ic)"></td>
+                <td class="py-1 pr-2" x-text="fmtNum(c.rank_ic_ir)"></td>
+                <td class="py-1 pr-2" x-text="c.direction === 1 ? '正向' : '反向'"></td>
+                <td class="py-1 pr-2" x-text="c.oos_ok ? '通过' : '未过'"></td>
+                <td class="py-1 pr-2" x-text="c.wf_ok != null ? (c.wf_ok ? '通过' : '未过') : '-'"></td>
+                <td class="py-1 pr-2" x-text="c.p_value != null ? c.p_value.toFixed(3) : '-'"></td>
+                <td class="py-1 pr-2">
+                  <button @click="rlSaveOne(c)" class="px-2 py-0.5 text-xs bg-blue-600 text-white rounded">入库</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 多岛迁移事件 -->
+    <div x-show="(rlResult?.migration_events || []).length" class="bg-white rounded-lg p-4 shadow-sm">
+      <h3 class="text-sm font-semibold mb-2 text-gray-700">多岛精英迁移 (n_islands=<span x-text="rlResult?.n_islands"></span>)</h3>
+      <div class="space-y-1 max-h-32 overflow-y-auto text-xs">
+        <template x-for="(m, i) in (rlResult?.migration_events || [])" :key="i">
+          <div class="text-gray-600">步 <span x-text="m.step"></span>: 收集 <span x-text="m.collected"></span> 精英, 注入 <span x-text="m.injected"></span>, Top: <span class="font-mono truncate" x-text="m.top_formula"></span></div>
+        </template>
+      </div>
+    </div>
+  </div>
+

@@ -66,7 +66,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 
 from routes import morning, live, review, system as sys_route, backtest, dragon, data_collection, sector_rotation, concept_rotation, stock_quote, dragon_review, trade_plan, factor, page_settings
 from agent.server import router as agent_chat_router
-from routes.live import SIM_RUNNER as _LIVE_SIM
+from lib.live_simulator import SIM_RUNNER as _LIVE_SIM  # Stage 2: 切断路由横向耦合
 from lib.live_simulator import merge_watch_codes
 
 
@@ -103,6 +103,8 @@ api.mount("/static", StaticFiles(directory=str(THIS_DIR / "static")), name="stat
 
 # Jinja2 模板
 templates = Jinja2Templates(directory=str(THIS_DIR / "templates"))
+# Stage 5: 全站静态资源 cache-busting 统一版本号 (单一来源, 模板内一律用 ?v={{ app_ver }})
+templates.env.globals["app_ver"] = "20260902"
 
 # REST 路由
 api.include_router(morning.router,        prefix="/api/morning",        tags=["morning"])
@@ -193,14 +195,17 @@ def page_data_collection(request: Request):
 
 @api.get("/sector-rotation", response_class=HTMLResponse)
 def page_sector_rotation(request: Request):
-    return templates.TemplateResponse(request, "sector_rotation.html",
-                                      {"active": "sector-rotation"})
+    # 板块/概念轮动共用统一模板 rotation.html, 维度差异经 SECTOR 配置注入
+    from services.rotation.dimension import SECTOR
+    return templates.TemplateResponse(request, "rotation.html",
+                                      {"active": "sector-rotation", "rotation": SECTOR})
 
 
 @api.get("/concept-rotation", response_class=HTMLResponse)
 def page_concept_rotation(request: Request):
-    return templates.TemplateResponse(request, "concept_rotation.html",
-                                      {"active": "concept-rotation"})
+    from services.rotation.dimension import CONCEPT
+    return templates.TemplateResponse(request, "rotation.html",
+                                      {"active": "concept-rotation", "rotation": CONCEPT})
 
 
 @api.get("/stock-quote", response_class=HTMLResponse)
@@ -221,7 +226,41 @@ def page_factor(request: Request):
                                       {"active": "factor"})
 
 
-# 交易计划页面路由在 routes/trade_plan.py 中定义
+# ------------- 交易计划页面 (Stage 2: 页面路由统一归位 app.py) -------------
+
+@api.get("/trade-plan", response_class=HTMLResponse)
+def page_trade_plan(request: Request):
+    """交易计划根路径: 有监控标的则进入第一只详情页, 否则提示先去 /live 添加"""
+    from datetime import date
+    from lib.live_simulator import merge_watch_codes
+    from lib.stock_utils import normalize_code
+    codes = merge_watch_codes([])
+    if codes:
+        first = normalize_code(codes[0])
+        return RedirectResponse(url=f"/trade-plan/{first}?plan_type=sim")
+    return templates.TemplateResponse(request, "trade_plan.html",
+                                      {"active": "trade-plan",
+                                       "code": "",
+                                       "plan_type": "sim",
+                                       "trade_date": date.today().isoformat()})
+
+
+@api.get("/trade-plan/list", response_class=HTMLResponse)
+def page_trade_plan_list(request: Request):
+    """旧列表页入口统一重定向到新的详情页入口"""
+    return RedirectResponse(url="/trade-plan")
+
+
+@api.get("/trade-plan/{code}", response_class=HTMLResponse)
+def page_trade_plan_detail(request: Request, code: str, plan_type: str = "sim"):
+    """交易计划详情页"""
+    from datetime import date
+    from lib.stock_utils import normalize_code
+    return templates.TemplateResponse(request, "trade_plan.html",
+                                      {"active": "trade-plan",
+                                       "code": normalize_code(code),
+                                       "plan_type": plan_type,
+                                       "trade_date": date.today().isoformat()})
 
 
 # ------------- 挂载 Gradio 到 /gradio-chat/ (供 /chat 页面 iframe 嵌入) -------------

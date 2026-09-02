@@ -1,0 +1,1340 @@
+<!-- ==================== QuantGP 因子挖掘 (复刻 QuantGplearn 原版, 内嵌于因子库"因子挖掘"子页面) ==================== -->
+<div x-data="quantGpApp()" x-init="init()">
+
+  <!-- 顶部标题 + 运行控制 -->
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-xl font-bold text-gray-800">QuantGP 因子挖掘</h1>
+      <p class="text-xs text-gray-500 mt-0.5">完全复刻 QuantGplearn 原版 GP 因子挖掘（搜索空间/建树/遗传/执行/适应度/收尾零改动，仅数据输入与结果输出做本系统适配）</p>
+    </div>
+    <div class="flex gap-2 items-center">
+      <button @click="startMine()" :disabled="mining"
+              class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              x-text="mining ? '挖掘中...' : '开始挖掘'"></button>
+      <button @click="stopMine()" :disabled="!mining"
+              class="px-4 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">停止</button>
+      <span class="text-xs text-gray-500" x-show="nStocks > 0" x-text="'股票数: ' + nStocks"></span>
+    </div>
+  </div>
+
+  <!-- 参数配置区 -->
+  <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+    <div class="flex items-center gap-2 mb-3">
+      <h2 class="text-sm font-bold text-gray-700">参数配置</h2>
+      <span class="text-[11px] text-gray-400">改动后 500ms 自动保存，多实例共享、重启保留</span>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+      <!-- 数据区 -->
+      <div class="col-span-2 lg:col-span-4 xl:col-span-6">
+        <div class="text-[11px] font-semibold text-gray-400 uppercase mb-1">数据输入（本系统行情面板）</div>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">股票池</label>
+        <select x-model="poolType" @change="poolRef=''" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="active">成交活跃股(自动)</option>
+          <option value="industry">申万行业</option>
+          <option value="sector">板块</option>
+          <option value="concept">概念</option>
+          <option value="index">常见指数</option>
+          <option value="custom">自定义(代码列表)</option>
+        </select>
+      </div>
+      <template x-if="poolType !== 'active' && poolType !== 'custom'">
+        <div>
+          <label class="block text-[11px] text-gray-500 mb-0.5">池子选项</label>
+          <select x-model="poolRef" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <option value="">(未选择)</option>
+            <template x-for="opt in poolOptions" :key="opt.value">
+              <option :value="opt.value" x-text="opt.label"></option>
+            </template>
+          </select>
+        </div>
+      </template>
+      <template x-if="poolType === 'custom'">
+        <div>
+          <label class="block text-[11px] text-gray-500 mb-0.5">代码列表</label>
+          <input type="text" x-model="poolRef" placeholder="600519.SH,000001.SZ" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+      </template>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">开始日期</label>
+        <input type="date" x-model="startDate" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">结束日期</label>
+        <input type="date" x-model="endDate" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">调仓周期(天)</label>
+        <input type="number" min="1" max="30" x-model.number="rebalPeriod" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div class="col-span-2 lg:col-span-4 xl:col-span-6">
+        <label class="block text-[11px] text-gray-500 mb-1">特征字段（喂入原版搜索空间，X1..Xn 索引）</label>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="(f, fi) in allFields" :key="'f_' + fi">
+            <label class="flex items-center gap-1 text-xs text-gray-600">
+              <input type="checkbox" :value="f" x-model="featureNames" class="accent-blue-600">
+              <span x-text="f"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+
+      <!-- GP 算法区 -->
+      <div class="col-span-2 lg:col-span-4 xl:col-span-6 mt-2">
+        <div class="text-[11px] font-semibold text-gray-400 uppercase mb-1">GP 算法（原版 GpuSymbolicTransformer 参数原样透传）</div>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">种群大小</label>
+        <input type="number" min="10" x-model.number="populationSize" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Hall of Fame</label>
+        <input type="number" min="1" x-model.number="hallOfFame" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">组件数</label>
+        <input type="number" min="1" x-model.number="nComponents" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">代数</label>
+        <input type="number" min="1" x-model.number="generations" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">锦标赛规模</label>
+        <input type="number" min="1" x-model.number="tournamentSize" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">适应度目标</label>
+        <select x-model="objective" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="ic">ic (Pearson IC)</option>
+          <option value="rank_ic">rank_ic (Rank IC)</option>
+          <option value="icir">icir (ICIR)</option>
+          <option value="rank_icir">rank_icir (Rank ICIR)</option>
+          <option value="long_short_sharpe">long_short_sharpe</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">初始化深度(min)</label>
+        <input type="number" min="1" x-model.number="initDepthMin" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">初始化深度(max)</label>
+        <input type="number" min="1" x-model.number="initDepthMax" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">初始化方法</label>
+        <select x-model="initMethod" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="half and half">half and half</option>
+          <option value="grow">grow</option>
+          <option value="full">full</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">常数范围(min)</label>
+        <input type="number" step="0.1" x-model.number="constMin" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">常数范围(max)</label>
+        <input type="number" step="0.1" x-model.number="constMax" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">复杂度惩罚系数</label>
+        <input type="number" step="0.0001" min="0" x-model.number="parsimony" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">交叉概率</label>
+        <input type="number" step="0.05" min="0" max="1" x-model.number="pCrossover" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">子树变异概率</label>
+        <input type="number" step="0.05" min="0" max="1" x-model.number="pSubtreeMut" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Hoist变异概率</label>
+        <input type="number" step="0.05" min="0" max="1" x-model.number="pHoistMut" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">点变异概率</label>
+        <input type="number" step="0.05" min="0" max="1" x-model.number="pPointMut" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">点替换概率</label>
+        <input type="number" step="0.01" min="0" max="1" x-model.number="pPointReplace" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">样本比例</label>
+        <input type="number" step="0.1" min="0.1" max="1" x-model.number="maxSamples" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">树节点数上限</label>
+        <input type="number" min="1" x-model.number="maxLength" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">去冗余相关阈值</label>
+        <input type="number" step="0.05" min="0" max="1" x-model.number="tolerableCorr" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">设备</label>
+        <select x-model="device" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="cuda">cuda (GPU)</option>
+          <option value="cpu">cpu</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">随机种子</label>
+        <input type="number" x-model.number="randomState" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+
+      <!-- 收敛与预处理区 (原版内置能力, 默认值对齐原版, 可配置) -->
+      <div class="col-span-2 lg:col-span-4 xl:col-span-6 mt-2">
+        <div class="text-[11px] font-semibold text-gray-400 uppercase mb-1">收敛与预处理（原版内置，默认对齐原版）</div>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">适应度早停阈值</label>
+        <input type="number" step="0.05" min="0" x-model.number="stoppingCriteria" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">因子变换</label>
+        <select x-model="transformer" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="">无</option>
+          <option value="sigmoid">sigmoid</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">逐日截面标准化</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="normalize" class="accent-blue-600">
+          <span>算IC前逐日 z-score</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">内存优化</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="lowMemory" class="accent-blue-600">
+          <span>只保留最近一代种群</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">得分缓存</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="cacheScores" class="accent-blue-600">
+          <span>缓存每代得分</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">因子缓存</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="cacheFactors" class="accent-blue-600">
+          <span>缓存因子值</span>
+        </label>
+      </div>
+
+      <!-- A档增强区 (外部适配层, 默认关闭, 不扰乱原版; 处理逻辑在后端) -->
+      <div class="col-span-2 lg:col-span-4 xl:col-span-6 mt-2">
+        <div class="text-[11px] font-semibold text-gray-400 uppercase mb-1">A档增强（外部复核与预处理，默认关闭）</div>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">训练段占比</label>
+        <input type="number" step="0.05" min="0.1" max="1" x-model.number="trainRatio" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">样本外复核</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="enableOos" class="accent-blue-600">
+          <span>测试段重算 IC/RankIC</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Permutation 检验</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="enablePerm" class="accent-blue-600">
+          <span>打乱目标测显著性</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Permutation 次数</label>
+        <input type="number" min="10" x-model.number="nPerm" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">target 正交化</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="enableTargetOrtho" class="accent-blue-600">
+          <span>池回归 target 取残差（对齐 Auto-Alpha）</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">正交化轮数</label>
+        <input type="number" min="1" x-model.number="nRounds" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">收尾筛选</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="enableFinalScreen" class="accent-blue-600">
+          <span>|IC|排序+相关去冗余（对齐 Auto-Alpha）</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">收尾 |IC| 阈值</label>
+        <input type="number" step="0.005" min="0" x-model.number="finalIcThreshold" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">收尾相关阈值</label>
+        <input type="number" step="0.05" min="0" max="1" x-model.number="finalCorrThreshold" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">兜底数量</label>
+        <input type="number" min="1" x-model.number="finalMinFactors" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">数量上限</label>
+        <input type="number" min="1" x-model.number="finalMaxFactors" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">假发现门闸</label>
+        <label class="flex items-center gap-1 text-xs text-gray-600 h-7">
+          <input type="checkbox" x-model="enableFdr" class="accent-blue-600">
+          <span>Perm+DSR+Subsample+Decay+CV（对齐 QuantAlpha）</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">DSR 试验次数</label>
+        <input type="number" min="2" x-model.number="fdrNTrials" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Subsample 次数</label>
+        <input type="number" min="1" x-model.number="fdrNSubsample" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">CV 折数</label>
+        <input type="number" min="2" x-model.number="fdrCvFolds" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Decay horizons</label>
+        <input type="text" x-model="fdrDecayHorizons" placeholder="1,2,5,10,20" class="w-full h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+    </div>
+  </div>
+
+  <!-- 进度区 -->
+  <div class="bg-white rounded-lg shadow-sm p-4 mb-4" x-show="mining || curve.length">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div class="bg-blue-600 h-2 rounded-full transition-all" :style="'width: ' + progressPct + '%'"></div>
+      </div>
+      <span class="text-xs text-gray-500 font-mono" x-text="progressText"></span>
+    </div>
+    <div class="text-xs text-gray-400 font-mono whitespace-pre-line" x-text="runLog" x-show="runLog"></div>
+  </div>
+
+  <!-- 结果区 -->
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <!-- 进化曲线 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-bold text-gray-700">进化曲线（每代 best / avg）</h2>
+      </div>
+      <div id="qgp-evolution-chart" class="h-72"></div>
+    </div>
+
+    <!-- 候选因子 -->
+    <div class="bg-white rounded-lg shadow-sm p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-bold text-gray-700">候选因子（原版最优程序 → 本系统公式）</h2>
+        <div class="flex gap-2 items-center">
+          <label class="flex items-center gap-1 text-xs text-gray-600">
+            <input type="checkbox" :checked="candSelected.length === candidates.length && candidates.length > 0" @change="toggleAll($event.target.checked)" class="accent-blue-600">
+            全选
+          </label>
+          <button @click="runEvalSelected()" :disabled="mining || !candidates.length || evalRunning"
+                  class="px-3 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50"
+                  x-text="evalRunning ? '评价中...' : '单因子评价'"></button>
+          <button @click="importSelected()" :disabled="mining || candSelected.length === 0"
+                  class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">批量入库</button>
+        </div>
+      </div>
+      <div class="text-xs text-gray-400 mb-2" x-show="!candidates.length && !mining">尚未运行挖掘。点击"开始挖掘"运行原版 QuantGplearn。</div>
+      <div class="max-h-80 overflow-y-auto">
+        <table class="w-full text-xs" x-show="candidates.length">
+          <thead class="sticky top-0 bg-gray-50">
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 px-1 w-6"></th>
+              <th class="py-1 px-1">#</th>
+              <th class="py-1 px-1">原版表达式</th>
+              <th class="py-1 px-1">本系统公式</th>
+              <th class="py-1 px-1">score</th>
+              <th class="py-1 px-1 w-16">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(c, i) in candidates" :key="i">
+              <tr class="border-b hover:bg-gray-50 align-top" :class="candSelected.includes(i) ? 'bg-blue-50' : ''">
+                <td class="py-1 px-1">
+                  <input type="checkbox" :checked="candSelected.includes(i)" @change="toggleCand(i)" class="accent-blue-600">
+                </td>
+                <td class="py-1 px-1 text-gray-400" x-text="i+1"></td>
+                <td class="py-1 px-1 font-mono" x-text="c.qg_expr"></td>
+                <td class="py-1 px-1 font-mono text-blue-700 break-all" x-text="c.formula || '(无法翻译)'"></td>
+                <td class="py-1 px-1" x-text="c.score != null ? c.score.toFixed(4) : '-'"></td>
+                <td class="py-1 px-1">
+                  <button @click="importOne(c)" :disabled="mining || !c.formula"
+                          class="px-2 py-0.5 text-[11px] bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">入库</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="text-xs text-gray-500 mt-2" x-show="importSummary" x-text="importSummary"></div>
+    </div>
+  </div>
+
+  <!-- ==================== A档复核报告区 (数据分段 / OOS / Permutation / target 正交化 / 收尾筛选 / 假发现门闸) ==================== -->
+  <div class="bg-white rounded-lg shadow-sm p-4 mt-4"
+       x-show="segments || oosReport.length || permReport.length || orthoInfo?.enabled || finalScreenReport?.enabled || fdrReport?.length">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-sm font-bold text-gray-700">A档复核报告（样本外 / 显著性 / target 正交化 / 收尾筛选 / 假发现门闸）</h2>
+      <button @click="clearAReport()" class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700">清空</button>
+    </div>
+
+    <!-- 数据分段 -->
+    <div class="border border-gray-200 rounded-lg p-3 mb-3" x-show="segments">
+      <div class="text-[11px] font-semibold text-gray-500 mb-1">数据分段</div>
+      <div class="text-xs text-gray-600 font-mono"
+            x-text="'训练 [' + segments?.train_start + ' ~ ' + segments?.train_end + ']' +
+                    '  测试 [' + segments?.test_start + ' ~ ' + segments?.test_end + ']'"></div>
+    </div>
+
+    <!-- OOS 复核 -->
+    <div class="border border-gray-200 rounded-lg p-3 mb-3" x-show="oosReport.length">
+      <div class="text-[11px] font-semibold text-gray-500 mb-1">样本外复核（测试段，原版机制重算）</div>
+      <div class="max-h-52 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="sticky top-0 bg-gray-50">
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 px-1">#</th>
+              <th class="py-1 px-1">原版表达式</th>
+              <th class="py-1 px-1">IC</th>
+              <th class="py-1 px-1">RankIC</th>
+              <th class="py-1 px-1">ICIR</th>
+              <th class="py-1 px-1">RankICIR</th>
+              <th class="py-1 px-1">可算</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(r, i) in oosReport" :key="i">
+              <tr class="border-b hover:bg-gray-50 align-top">
+                <td class="py-1 px-1 text-gray-400" x-text="i+1"></td>
+                <td class="py-1 px-1 font-mono break-all" x-text="r.qg_expr"></td>
+                <td class="py-1 px-1" :class="icColor(r.ic)" x-text="fmtNum(r.ic)"></td>
+                <td class="py-1 px-1" :class="icColor(r.rank_ic)" x-text="fmtNum(r.rank_ic)"></td>
+                <td class="py-1 px-1" :class="icColor(r.icir)" x-text="fmtNum(r.icir)"></td>
+                <td class="py-1 px-1" :class="icColor(r.rank_icir)" x-text="fmtNum(r.rank_icir)"></td>
+                <td class="py-1 px-1" x-text="r.oos_ok ? '是' : '否'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Permutation 显著性 -->
+    <div class="border border-gray-200 rounded-lg p-3 mb-3" x-show="permReport.length">
+      <div class="text-[11px] font-semibold text-gray-500 mb-1">Permutation 显著性检验（打乱目标，经验 p 值）</div>
+      <div class="max-h-52 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="sticky top-0 bg-gray-50">
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 px-1">#</th>
+              <th class="py-1 px-1">原版表达式</th>
+              <th class="py-1 px-1">真实 RankIC</th>
+              <th class="py-1 px-1">空分布均值</th>
+              <th class="py-1 px-1">空分布标准差</th>
+              <th class="py-1 px-1">p 值</th>
+              <th class="py-1 px-1">显著</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(r, i) in permReport" :key="i">
+              <tr class="border-b hover:bg-gray-50 align-top">
+                <td class="py-1 px-1 text-gray-400" x-text="i+1"></td>
+                <td class="py-1 px-1 font-mono break-all" x-text="r.qg_expr"></td>
+                <td class="py-1 px-1" :class="icColor(r.real_ic)" x-text="fmtNum(r.real_ic)"></td>
+                <td class="py-1 px-1" x-text="fmtNum(r.null_mean)"></td>
+                <td class="py-1 px-1" x-text="fmtNum(r.null_std)"></td>
+                <td class="py-1 px-1" x-text="r.p_value != null ? r.p_value.toFixed(4) : '-'"></td>
+                <td class="py-1 px-1" x-text="r.significant ? '是' : '否'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- target 正交化 (Auto-Alpha-Finding 机制) -->
+    <div class="border border-gray-200 rounded-lg p-3" x-show="orthoInfo?.enabled">
+      <div class="text-[11px] font-semibold text-gray-500 mb-1">target 正交化（对齐 Auto-Alpha-Finding：池回归 target 取残差再挖掘）</div>
+      <div class="text-xs text-gray-600 mb-1">
+        轮数 <span class="font-semibold" x-text="orthoInfo?.n_rounds"></span>，
+        池因子：开始 <span class="font-semibold" x-text="orthoInfo?.pool_before"></span> → 结束 <span class="font-semibold" x-text="orthoInfo?.pool_after"></span>
+      </div>
+      <div class="max-h-40 overflow-y-auto">
+        <table class="w-full text-xs" x-show="(orthoInfo?.rounds || []).length">
+          <thead class="sticky top-0 bg-gray-50">
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 px-1">轮</th>
+              <th class="py-1 px-1">池大小</th>
+              <th class="py-1 px-1">本轮候选</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(rd, i) in (orthoInfo?.rounds || [])" :key="i">
+              <tr class="border-b hover:bg-gray-50 align-top">
+                <td class="py-1 px-1 text-gray-400" x-text="rd.round"></td>
+                <td class="py-1 px-1" x-text="rd.pool_size"></td>
+                <td class="py-1 px-1" x-text="rd.n_candidates"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 收尾筛选 (Auto-Alpha-Finding 收尾段) -->
+    <div class="border border-gray-200 rounded-lg p-3" x-show="finalScreenReport?.enabled">
+      <div class="text-[11px] font-semibold text-gray-500 mb-1">收尾筛选（对齐 Auto-Alpha-Finding：|IC| 排序 + 相关去冗余 + |IC| 阈值 + 兜底/上限）</div>
+      <div class="text-xs text-gray-600 mb-1">
+        候选 <span class="font-semibold" x-text="finalScreenReport?.n_total"></span> 个 → 保留 <span class="font-semibold" x-text="finalScreenReport?.n_kept"></span> 个，
+        |IC| 阈值 <span class="font-semibold" x-text="finalScreenReport?.ic_threshold"></span>，
+        相关阈值 <span class="font-semibold" x-text="finalScreenReport?.corr_threshold"></span>
+        <span x-show="finalScreenReport?.fallback_used" class="text-amber-600">（触发兜底）</span>
+      </div>
+      <div class="max-h-52 overflow-y-auto">
+        <table class="w-full text-xs" x-show="(finalScreenReport?.scored || []).length">
+          <thead class="sticky top-0 bg-gray-50">
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 px-1">公式</th>
+              <th class="py-1 px-1">|IC|</th>
+              <th class="py-1 px-1">最大相关</th>
+              <th class="py-1 px-1">保留</th>
+              <th class="py-1 px-1">原因</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(it, i) in (finalScreenReport?.scored || [])" :key="i">
+              <tr class="border-b hover:bg-gray-50 align-top">
+                <td class="py-1 px-1 font-mono break-all" x-text="it.formula"></td>
+                <td class="py-1 px-1" x-text="Math.abs(it.ic) != null ? Math.abs(it.ic).toFixed(4) : '-'"></td>
+                <td class="py-1 px-1" x-text="it.max_corr != null ? it.max_corr.toFixed(4) : '-'"></td>
+                <td class="py-1 px-1" :class="it.kept ? 'text-green-600' : 'text-red-500'" x-text="it.kept ? '保留' : '筛掉'"></td>
+                <td class="py-1 px-1" x-text="it.reason"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 假发现门闸 (QuantAlpha False Discovery Gauntlet) -->
+    <div class="border border-gray-200 rounded-lg p-3" x-show="(fdrReport || []).length">
+      <div class="text-[11px] font-semibold text-gray-500 mb-1">假发现门闸（对齐 QuantAlpha：Permutation + Deflated Sharpe + Subsample + Decay + CV Consistency → Verdict）</div>
+      <div class="text-xs text-gray-600 mb-2" x-text="'门闸在测试段(perm/subsample/decay) + 训练段(CV consistency)上只读评估已训练候选, 不改训练/不改第三方'"></div>
+      <div class="max-h-64 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="sticky top-0 bg-gray-50">
+            <tr class="text-left text-gray-500 border-b">
+              <th class="py-1 px-1">原版表达式</th>
+              <th class="py-1 px-1">Verdict</th>
+              <th class="py-1 px-1">Perm p</th>
+              <th class="py-1 px-1">DSR</th>
+              <th class="py-1 px-1">Subsample</th>
+              <th class="py-1 px-1">Decay 单调</th>
+              <th class="py-1 px-1">CV 正比</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(f, i) in (fdrReport || [])" :key="i">
+              <tr class="border-b hover:bg-gray-50 align-top">
+                <td class="py-1 px-1 font-mono break-all" x-text="f.qg_expr"></td>
+                <td class="py-1 px-1 font-semibold"
+                    :class="f.verdict === 'ROBUST' ? 'text-green-600' : (f.verdict === 'MARGINAL' ? 'text-amber-600' : (f.verdict === 'UNSTABLE' ? 'text-red-500' : 'text-gray-400'))"
+                    x-text="f.verdict || '-'"></td>
+                <td class="py-1 px-1" x-text="f.perm?.p_value != null ? f.perm.p_value.toFixed(4) : '-'"></td>
+                <td class="py-1 px-1" :class="f.deflated_sharpe?.passed ? 'text-green-600' : 'text-gray-500'"
+                    x-text="f.deflated_sharpe?.deflated_sharpe != null ? (f.deflated_sharpe.passed ? '✓' : '✗') + ' ' + f.deflated_sharpe.deflated_sharpe.toFixed(2) : '-'"></td>
+                <td class="py-1 px-1" x-text="f.subsample?.stability != null ? (f.subsample.stability * 100).toFixed(0) + '%' : '-'"></td>
+                <td class="py-1 px-1" x-text="f.decay?.monotonic_decay != null ? (f.decay.monotonic_decay ? '是' : '否') : '-'"></td>
+                <td class="py-1 px-1" x-text="f.cv?.positive_ratio != null ? (f.cv.positive_ratio * 100).toFixed(0) + '%' : '-'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="text-[11px] text-gray-400 mt-1">
+        预设阈值: ROBUST = CV≥75% 且 Perm p&lt;0.05 且 Subsample&gt;50% 且 DSR 通过; MARGINAL = CV≥50% 且 Perm p&lt;0.10; 其余 UNSTABLE
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 单因子评价结果区 (训练结果下方, 挖掘后可点按钮评价) ==================== -->
+  <div class="bg-white rounded-lg shadow-sm p-4 mt-4" x-show="evalResults.length || evalRunning">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-sm font-bold text-gray-700">单因子评价结果（IC / 分层 / 分位 / 含成本绩效）</h2>
+      <div class="flex gap-2 items-center">
+        <span class="text-xs text-gray-500" x-show="evalRunning" x-text="evalProgress"></span>
+        <span class="text-xs text-gray-400" x-show="!evalRunning && evalResults.length"
+              x-text="'完成, 成功 ' + evalOkCount + ' 个, 跳过 ' + (evalResults.length - evalOkCount) + ' 个'"></span>
+        <button @click="clearEval()" :disabled="evalRunning"
+                class="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50">清空</button>
+      </div>
+    </div>
+
+    <template x-for="(ev, i) in evalResults" :key="i">
+      <div class="border border-gray-200 rounded-lg mb-3 overflow-hidden">
+        <!-- 因子头 -->
+        <div class="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border-b">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs text-gray-400 font-mono shrink-0" x-text="i + 1"></span>
+            <span class="text-xs font-mono text-blue-700 break-all" x-text="ev.formula || ev.qg_expr"></span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0 text-xs">
+            <span x-show="ev.score != null" class="px-2 py-0.5 rounded bg-blue-50 text-blue-600"
+                  x-text="'score=' + (ev.score != null ? ev.score.toFixed(4) : '-')"></span>
+            <span x-show="ev.ok && ev.direction !== 'unknown'"
+                  class="px-2 py-0.5 rounded"
+                  :class="ev.direction === 'positive' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'"
+                  x-text="'方向:' + (ev.direction === 'positive' ? '正向' : '反向')"></span>
+          </div>
+        </div>
+        <!-- ok=False: 跳过原因 -->
+        <div class="px-3 py-2 text-xs text-red-500" x-show="!ev.ok" x-text="'跳过: ' + ev.reason"></div>
+        <!-- ok=True: 指标卡 + 图表 -->
+        <template x-if="ev.ok">
+          <div class="p-3">
+            <div class="grid grid-cols-7 gap-2 text-center mb-2">
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">IC均值</div><div class="text-sm font-bold" :class="icColor(ev.ic_timeseries?.ic_mean)" x-text="fmtNum(ev.ic_timeseries?.ic_mean)"></div></div>
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">IR</div><div class="text-sm font-bold" :class="icColor(ev.ic_timeseries?.ir)" x-text="fmtNum(ev.ic_timeseries?.ir)"></div></div>
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">RankIC</div><div class="text-sm font-bold" :class="icColor(ev.ic_timeseries?.rank_ic_mean)" x-text="fmtNum(ev.ic_timeseries?.rank_ic_mean)"></div></div>
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">多空收益</div><div class="text-sm font-bold" x-text="fmtPct(ev.layered_backtest?.long_short)"></div></div>
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">PWC夏普</div><div class="text-sm font-bold" :class="icColor(ev.performance_with_cost?.sharpe_ratio)" x-text="fmtNum(ev.performance_with_cost?.sharpe_ratio)"></div></div>
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">有效性</div><div class="text-sm font-bold" x-text="ev.effectiveness_grade?.ic_grade"></div></div>
+              <div class="bg-gray-50 rounded p-1.5"><div class="text-[11px] text-gray-500">评价方式</div><div class="text-sm font-bold" x-text="ev.factor_type"></div></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <div class="text-[11px] text-gray-600 mb-1">IC 时序</div>
+                <div :id="'qgp-eval-ic-' + i" style="height: 200px;"></div>
+              </div>
+              <div>
+                <div class="text-[11px] text-gray-600 mb-1">分层收益</div>
+                <div :id="'qgp-eval-layer-' + i" style="height: 200px;"></div>
+              </div>
+              <div>
+                <div class="text-[11px] text-gray-600 mb-1">分位收益</div>
+                <div :id="'qgp-eval-quantile-' + i" style="height: 200px;"></div>
+              </div>
+              <div>
+                <div class="text-[11px] text-gray-600 mb-1">PWC 累计收益 (含成本)</div>
+                <div :id="'qgp-eval-pwc-' + i" style="height: 200px;"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <!-- toast -->
+  <div x-show="toast" x-transition.opacity
+       class="fixed bottom-6 right-6 px-4 py-2 rounded shadow-lg text-sm text-white z-50"
+       :class="toastType === 'error' ? 'bg-red-600' : 'bg-gray-800'">
+    <span x-text="toast"></span>
+  </div>
+</div>
+
+<script>
+function quantGpApp() {
+  return {
+    // ---- 数据输入 ----
+    poolType: 'active',
+    poolRef: '',
+    stockPools: {pool_types: [], industries: [], sectors: [], concepts: [], indexes: []},
+    startDate: '2023-01-01',
+    endDate: '2025-12-31',
+    rebalPeriod: 5,
+    allFields: ['open', 'high', 'low', 'close', 'volume', 'amount', 'turnover_rate'],
+    featureNames: ['open', 'high', 'low', 'close', 'volume', 'amount', 'turnover_rate'],
+
+    // ---- GP 参数 (原版 GpuSymbolicTransformer, 默认值与原版一致) ----
+    populationSize: 300,
+    hallOfFame: 50,
+    nComponents: 10,
+    generations: 10,
+    tournamentSize: 10,
+    initDepthMin: 2,
+    initDepthMax: 5,
+    initMethod: 'half and half',
+    objective: 'rank_ic',
+    constMin: -1.0,
+    constMax: 1.0,
+    parsimony: 0.001,
+    pCrossover: 0.5,
+    pSubtreeMut: 0.2,
+    pHoistMut: 0.1,
+    pPointMut: 0.1,
+    pPointReplace: 0.05,
+    maxSamples: 1.0,
+    maxLength: 24,
+    tolerableCorr: 0.7,
+    device: 'cuda',
+    randomState: 42,
+
+    // ---- 原版内置能力 (C 档增强, 默认值对齐原版, 可配置) ----
+    stoppingCriteria: 1.0,   // 适应度绝对阈值早停 (原版默认 1.0)
+    transformer: '',         // 因子变换: ''=无, 'sigmoid' (原版默认 None)
+    normalize: true,         // 逐日截面 z-score 后再算 IC (原版默认 True)
+    lowMemory: true,         // 内存优化: 只保留最近一代种群 (原版默认 True)
+    cacheScores: true,       // 得分缓存 (原版默认 True)
+    cacheFactors: false,     // 因子缓存 (原版默认 False)
+
+    // ---- A 档外部适配层增强 (默认关闭, 不扰乱原版; 处理逻辑在后端) ----
+    trainRatio: 1.0,         // 训练段占比 (<1 时启用训练/测试两段分段, 1.0 = 原版全量)
+    enableOos: false,        // 样本外复核: 测试段重算 IC/RankIC
+    enablePerm: false,       // permutation 显著性检验 (打乱目标测 p 值)
+    nPerm: 1000,             // permutation 打乱次数 (默认 1000, 对齐 QuantAlpha 原版)
+    enableTargetOrtho: false,  // target 正交化 (Auto-Alpha: 池回归 target 取残差再挖掘)
+    nRounds: 1,                // 多轮迭代轮数 (Auto-Alpha MINING_ROUNDS)
+    enableFinalScreen: false,  // 收尾筛选 (Auto-Alpha: |IC|排序+相关去冗余+IC阈值+兜底/上限)
+    finalIcThreshold: 0.03,    // |IC| 阈值 (Auto-Alpha IC_THRESHOLD_IS)
+    finalCorrThreshold: 0.9,   // 相关去冗余阈值 (Auto-Alpha max_corr)
+    finalMinFactors: 8,        // 通过 |IC| 候选不足时兜底数量 (Auto-Alpha MIN_FACTORS_FALLBACK)
+    finalMaxFactors: 15,       // 最终候选上限 (Auto-Alpha MAX_FACTORS_IN_POOL)
+    enableFdr: false,          // 假发现门闸 (QuantAlpha: Perm+DSR+Subsample+Decay+CV -> Verdict)
+    fdrNTrials: 96,            // Deflated Sharpe 试验次数 (QuantAlpha 96 个体)
+    fdrNSubsample: 20,         // Subsample 随机对半次数 (QuantAlpha 20)
+    fdrCvFolds: 3,             // CV consistency 训练段 expanding folds 数 (QuantAlpha 3)
+    fdrDecayHorizons: '1,2,5,10,20',  // Decay 分析 horizon 列表
+
+    // ---- 运行状态 ----
+    mining: false,
+    aborter: null,
+    nStocks: 0,
+    runLog: '',
+    curve: [],           // [{gen, best_fitness, avg_fitness, best_length, avg_length}]
+    progressPct: 0,
+    progressText: '未开始',
+    candidates: [],      // [{qg_expr, formula, score}]
+    candSelected: [],
+    importSummary: '',
+    toast: '',
+    toastType: 'info',
+
+    // ---- A 档复核报告 (挖掘 done 后填充, 用于展示区) ----
+    segments: null,      // {train_start, train_end, test_start, test_end}
+    oosReport: [],       // [{qg_expr, ic, rank_ic, icir, rank_icir, oos_ok}]
+    permReport: [],      // [{qg_expr, real_ic, null_mean, null_std, p_value, significant}]
+    orthoInfo: null,     // {enabled, n_rounds, pool_before, pool_after, rounds:[{round, pool_size, n_candidates}]}
+    finalScreenReport: null,  // 收尾筛选报告 {enabled, n_total, n_kept, ic_threshold, corr_threshold, scored:[...]}
+    fdrReport: null,          // 假发现门闸报告 [{qg_expr, perm, deflated_sharpe, subsample, decay, cv, verdict}]
+
+    // ---- 单因子评价 ----
+    evalRunning: false,
+    evalResults: [],
+    evalProgress: '',
+    evalAborter: null,
+
+    // ---- 状态保存 ----
+    _saveStateTimer: null,
+
+    // 评价成功个数 (供结果区头部摘要展示)
+    get evalOkCount() {
+      return (this.evalResults || []).filter(r => r.ok).length;
+    },
+
+    get poolOptions() {
+      const sp = this.stockPools || {};
+      if (this.poolType === 'industry') return (sp.industries || []).map(x => ({value: x.ref, label: x.ref + ' (' + x.count + '只)'}));
+      if (this.poolType === 'sector') return (sp.sectors || []).map(x => ({value: x.ref, label: x.ref + ' (' + x.count + '只)'}));
+      if (this.poolType === 'concept') return (sp.concepts || []).map(x => ({value: x.ref, label: x.ref + ' (' + x.count + '只)'}));
+      if (this.poolType === 'index') return (sp.indexes || []).map(x => ({value: x.ref, label: x.label}));
+      return [];
+    },
+
+    async api(url, opts = {}) {
+      const res = await fetch(url, {
+        headers: {'Content-Type': 'application/json'},
+        ...opts,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({detail: res.statusText}));
+        throw new Error(err.detail || 'API错误');
+      }
+      return res.json();
+    },
+
+    showToast(msg, type = 'info') {
+      this.toast = msg;
+      this.toastType = type;
+      setTimeout(() => this.toast = '', 3500);
+    },
+
+    // 防抖保存页面状态 (500ms, 与因子库页面机制一致, namespace=quantgp_page)
+    scheduleSavePageState() {
+      if (this._saveStateTimer) clearTimeout(this._saveStateTimer);
+      this._saveStateTimer = setTimeout(() => {
+        this._saveStateTimer = null;
+        this.savePageState();
+      }, 500);
+    },
+
+    savePageState() {
+      const s = {
+        poolType: this.poolType,
+        poolRef: this.poolRef,
+        startDate: this.startDate,
+        endDate: this.endDate,
+        rebalPeriod: this.rebalPeriod,
+        featureNames: this.featureNames || [],
+        populationSize: this.populationSize,
+        hallOfFame: this.hallOfFame,
+        nComponents: this.nComponents,
+        generations: this.generations,
+        tournamentSize: this.tournamentSize,
+        initDepthMin: this.initDepthMin,
+        initDepthMax: this.initDepthMax,
+        initMethod: this.initMethod,
+        objective: this.objective,
+        constMin: this.constMin,
+        constMax: this.constMax,
+        parsimony: this.parsimony,
+        pCrossover: this.pCrossover,
+        pSubtreeMut: this.pSubtreeMut,
+        pHoistMut: this.pHoistMut,
+        pPointMut: this.pPointMut,
+        pPointReplace: this.pPointReplace,
+        maxSamples: this.maxSamples,
+        maxLength: this.maxLength,
+        tolerableCorr: this.tolerableCorr,
+        device: this.device,
+        randomState: this.randomState,
+        stoppingCriteria: this.stoppingCriteria,
+        transformer: this.transformer,
+        normalize: this.normalize,
+        lowMemory: this.lowMemory,
+        cacheScores: this.cacheScores,
+        cacheFactors: this.cacheFactors,
+        // A 档增强参数 (默认关闭, 重启后保留)
+        trainRatio: this.trainRatio,
+        enableOos: this.enableOos,
+        enablePerm: this.enablePerm,
+        nPerm: this.nPerm,
+        enableTargetOrtho: this.enableTargetOrtho,
+        nRounds: this.nRounds,
+        // 收尾筛选参数 (对齐 Auto-Alpha-Finding 收尾段)
+        enableFinalScreen: this.enableFinalScreen,
+        finalIcThreshold: this.finalIcThreshold,
+        finalCorrThreshold: this.finalCorrThreshold,
+        finalMinFactors: this.finalMinFactors,
+        finalMaxFactors: this.finalMaxFactors,
+        // 假发现门闸参数 (对齐 QuantAlpha False Discovery Gauntlet)
+        enableFdr: this.enableFdr,
+        fdrNTrials: this.fdrNTrials,
+        fdrNSubsample: this.fdrNSubsample,
+        fdrCvFolds: this.fdrCvFolds,
+        fdrDecayHorizons: this.fdrDecayHorizons,
+      };
+      fetch('/api/page-settings/quantgp_page', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(s),
+      }).catch(() => {});
+    },
+
+    async loadPageState() {
+      try {
+        const r = await this.api('/api/page-settings/quantgp_page');
+        const s = r.data;
+        if (!s) return;
+        if (s.poolType != null) this.poolType = s.poolType;
+        if (s.poolRef != null) this.poolRef = s.poolRef;
+        if (s.startDate != null) this.startDate = s.startDate;
+        if (s.endDate != null) this.endDate = s.endDate;
+        if (s.rebalPeriod != null) this.rebalPeriod = Number(s.rebalPeriod) || 5;
+        if (Array.isArray(s.featureNames) && s.featureNames.length) this.featureNames = s.featureNames;
+        if (s.populationSize != null) this.populationSize = Number(s.populationSize) || 300;
+        if (s.hallOfFame != null) this.hallOfFame = Number(s.hallOfFame) || 50;
+        if (s.nComponents != null) this.nComponents = Number(s.nComponents) || 10;
+        if (s.generations != null) this.generations = Number(s.generations) || 10;
+        if (s.tournamentSize != null) this.tournamentSize = Number(s.tournamentSize) || 10;
+        if (s.initDepthMin != null) this.initDepthMin = Number(s.initDepthMin) || 2;
+        if (s.initDepthMax != null) this.initDepthMax = Number(s.initDepthMax) || 5;
+        if (s.initMethod != null) this.initMethod = s.initMethod;
+        if (s.objective != null) this.objective = s.objective;
+        if (s.constMin != null) this.constMin = Number(s.constMin);
+        if (s.constMax != null) this.constMax = Number(s.constMax);
+        if (s.parsimony != null) this.parsimony = Number(s.parsimony);
+        if (s.pCrossover != null) this.pCrossover = Number(s.pCrossover);
+        if (s.pSubtreeMut != null) this.pSubtreeMut = Number(s.pSubtreeMut);
+        if (s.pHoistMut != null) this.pHoistMut = Number(s.pHoistMut);
+        if (s.pPointMut != null) this.pPointMut = Number(s.pPointMut);
+        if (s.pPointReplace != null) this.pPointReplace = Number(s.pPointReplace);
+        if (s.maxSamples != null) this.maxSamples = Number(s.maxSamples);
+        if (s.maxLength != null) this.maxLength = Number(s.maxLength) || 24;
+        if (s.tolerableCorr != null) this.tolerableCorr = Number(s.tolerableCorr);
+        if (s.device != null) this.device = s.device;
+        if (s.randomState != null) this.randomState = Number(s.randomState);
+        if (s.stoppingCriteria != null) this.stoppingCriteria = Number(s.stoppingCriteria) || 1.0;
+        if (s.transformer != null) this.transformer = s.transformer;
+        if (s.normalize != null) this.normalize = !!s.normalize;
+        if (s.lowMemory != null) this.lowMemory = !!s.lowMemory;
+        if (s.cacheScores != null) this.cacheScores = !!s.cacheScores;
+        if (s.cacheFactors != null) this.cacheFactors = !!s.cacheFactors;
+        // A 档增强参数恢复 (勾选布尔用 != null 判断, false 也能正确恢复; 数字带默认值兜底)
+        if (s.trainRatio != null) this.trainRatio = Number(s.trainRatio) || 1.0;
+        if (s.enableOos != null) this.enableOos = !!s.enableOos;
+        if (s.enablePerm != null) this.enablePerm = !!s.enablePerm;
+        if (s.nPerm != null) this.nPerm = Number(s.nPerm) || 1000;
+        if (s.enableTargetOrtho != null) this.enableTargetOrtho = !!s.enableTargetOrtho;
+        if (s.nRounds != null) this.nRounds = Number(s.nRounds) || 1;
+        // 收尾筛选参数恢复 (勾选布尔用 != null 判断, false 也能正确恢复; 数字带默认值兜底)
+        if (s.enableFinalScreen != null) this.enableFinalScreen = !!s.enableFinalScreen;
+        if (s.finalIcThreshold != null) this.finalIcThreshold = Number(s.finalIcThreshold) || 0.03;
+        if (s.finalCorrThreshold != null) this.finalCorrThreshold = Number(s.finalCorrThreshold) || 0.9;
+        if (s.finalMinFactors != null) this.finalMinFactors = Number(s.finalMinFactors) || 8;
+        if (s.finalMaxFactors != null) this.finalMaxFactors = Number(s.finalMaxFactors) || 15;
+        // 假发现门闸参数恢复
+        if (s.enableFdr != null) this.enableFdr = !!s.enableFdr;
+        if (s.fdrNTrials != null) this.fdrNTrials = Number(s.fdrNTrials) || 96;
+        if (s.fdrNSubsample != null) this.fdrNSubsample = Number(s.fdrNSubsample) || 20;
+        if (s.fdrCvFolds != null) this.fdrCvFolds = Number(s.fdrCvFolds) || 3;
+        if (s.fdrDecayHorizons != null) this.fdrDecayHorizons = s.fdrDecayHorizons;
+      } catch (e) { /* 静默 */ }
+    },
+
+    async init() {
+      // 注册参数 watcher: 变更后 500ms 防抖保存到后端 (含 0 值)
+      const autoSaveParams = [
+        'poolType', 'poolRef', 'startDate', 'endDate', 'rebalPeriod', 'featureNames',
+        'populationSize', 'hallOfFame', 'nComponents', 'generations', 'tournamentSize',
+        'initDepthMin', 'initDepthMax', 'initMethod', 'objective',
+        'constMin', 'constMax', 'parsimony', 'pCrossover', 'pSubtreeMut',
+        'pHoistMut', 'pPointMut', 'pPointReplace', 'maxSamples', 'maxLength',
+        'tolerableCorr', 'device', 'randomState',
+        'stoppingCriteria', 'transformer', 'normalize', 'lowMemory',
+        'cacheScores', 'cacheFactors',
+        // A 档增强参数
+        'trainRatio', 'enableOos', 'enablePerm', 'nPerm', 'enableTargetOrtho',
+        'nRounds',
+        // 收尾筛选参数
+        'enableFinalScreen', 'finalIcThreshold', 'finalCorrThreshold',
+        'finalMinFactors', 'finalMaxFactors',
+        // 假发现门闸参数
+        'enableFdr', 'fdrNTrials', 'fdrNSubsample', 'fdrCvFolds', 'fdrDecayHorizons',
+      ];
+      autoSaveParams.forEach(p => this.$watch(p, () => this.scheduleSavePageState()));
+      await this.loadPageState();
+      window.addEventListener('pagehide', () => this.savePageState());
+      window.addEventListener('beforeunload', () => this.savePageState());
+      this.loadStockPools();
+    },
+
+    async loadStockPools() {
+      try {
+        const r = await this.api('/api/factor/stock_pools');
+        this.stockPools = r || this.stockPools;
+      } catch (e) { /* 静默 */ }
+    },
+
+    // ---- 挖掘 ----
+    buildBody() {
+      return {
+        poolType: this.poolType,
+        poolRef: this.poolRef,
+        startDate: this.startDate,
+        endDate: this.endDate,
+        rebalPeriod: this.rebalPeriod,
+        featureNames: this.featureNames.length ? this.featureNames : null,
+        population_size: this.populationSize,
+        hall_of_fame: this.hallOfFame,
+        n_components: this.nComponents,
+        generations: this.generations,
+        tournament_size: this.tournamentSize,
+        init_depth: [this.initDepthMin, this.initDepthMax],
+        init_method: this.initMethod,
+        objective: this.objective,
+        const_range: [this.constMin, this.constMax],
+        parsimony_coefficient: this.parsimony,
+        p_crossover: this.pCrossover,
+        p_subtree_mutation: this.pSubtreeMut,
+        p_hoist_mutation: this.pHoistMut,
+        p_point_mutation: this.pPointMut,
+        p_point_replace: this.pPointReplace,
+        max_samples: this.maxSamples,
+        max_length: this.maxLength,
+        tolerable_corr: this.tolerableCorr,
+        device: this.device,
+        random_state: this.randomState,
+        stopping_criteria: this.stoppingCriteria,
+        transformer: this.transformer || null,
+        normalize: this.normalize,
+        low_memory: this.lowMemory,
+        cache_scores: this.cacheScores,
+        cache_factors: this.cacheFactors,
+        // A 档增强参数 (后端在 mine_quantgp 外层适配, 默认关闭)
+        train_ratio: this.trainRatio,
+        enable_oos: this.enableOos,
+        enable_perm: this.enablePerm,
+        n_perm: this.nPerm,
+        enable_target_ortho: this.enableTargetOrtho,
+        n_rounds: this.nRounds,
+        // 收尾筛选参数 (对齐 Auto-Alpha-Finding 收尾段)
+        enable_final_screen: this.enableFinalScreen,
+        final_ic_threshold: this.finalIcThreshold,
+        final_corr_threshold: this.finalCorrThreshold,
+        final_min_factors_fallback: this.finalMinFactors,
+        final_max_factors_in_pool: this.finalMaxFactors,
+        // 假发现门闸参数
+        enable_fdr: this.enableFdr,
+        fdr_n_trials: this.fdrNTrials,
+        fdr_n_subsample: this.fdrNSubsample,
+        fdr_cv_folds: this.fdrCvFolds,
+        fdr_decay_horizons: (this.fdrDecayHorizons || '').split(',').map(s => parseInt(s.trim(), 10)).filter(v => !isNaN(v) && v > 0),
+      };
+    },
+
+    async startMine() {
+      if (this.mining) return;
+      this.mining = true;
+      this.runLog = '';
+      this.curve = [];
+      this.candidates = [];
+      this.candSelected = [];
+      this.importSummary = '';
+      // 重置 A 档复核报告
+      this.segments = null;
+      this.oosReport = [];
+      this.permReport = [];
+      this.orthoInfo = null;
+      this.progressPct = 0;
+      this.progressText = '启动中...';
+      if (this.aborter) this.aborter.abort();
+      this.aborter = new AbortController();
+      try {
+        await this.postSse('/api/factor/quantgp/mine/stream', this.buildBody(), (ev, data) => {
+          if (ev === 'progress') this.onProgress(data);
+        });
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          // 手动停止: 不弹错误提示
+          this.progressText = '已手动停止';
+        } else {
+          this.progressText = '失败: ' + e.message;
+          this.showToast('挖掘失败: ' + e.message, 'error');
+        }
+      } finally {
+        this.mining = false;
+      }
+    },
+
+    stopMine() {
+      if (this.aborter) this.aborter.abort();
+      this.progressText = '已手动停止';
+    },
+
+    onProgress(p) {
+      this.curve.push(p);
+      this.drawCurve();
+      this.progressPct = this.generations > 0 ? Math.min(100, Math.round(((p.gen + 1) / this.generations) * 100)) : 0;
+      this.progressText = '第 ' + p.gen + ' / ' + this.generations + ' 代, best=' + (p.best_fitness != null ? p.best_fitness.toFixed(4) : '-') + ', avg=' + (p.avg_fitness != null ? p.avg_fitness.toFixed(4) : '-');
+      this.runLog += 'gen ' + p.gen + ': best_fit=' + (p.best_fitness != null ? p.best_fitness.toFixed(4) : '-') + ' avg_fit=' + (p.avg_fitness != null ? p.avg_fitness.toFixed(4) : '-') + ' best_len=' + p.best_length + ' avg_len=' + (p.avg_length != null ? p.avg_length.toFixed(2) : '-') + ' t=' + (p.time != null ? p.time.toFixed(2) + 's' : '-') + '\n';
+    },
+
+    drawCurve() {
+      const el = document.getElementById('qgp-evolution-chart');
+      if (!el) return;
+      Plotly.purge('qgp-evolution-chart');
+      const traces = [
+        {type: 'scatter', x: this.curve.map(d => d.gen), y: this.curve.map(d => d.best_fitness),
+         name: 'best', mode: 'lines+markers', line: {color: '#3b82f6'}},
+        {type: 'scatter', x: this.curve.map(d => d.gen), y: this.curve.map(d => d.avg_fitness),
+         name: 'avg', mode: 'lines+markers', line: {color: '#8b5cf6'}},
+      ];
+      Plotly.newPlot('qgp-evolution-chart', traces, {
+        margin: {l: 50, r: 20, t: 10, b: 30},
+        xaxis: {title: '代数'},
+        yaxis: {title: '适应度'},
+        legend: {x: 0.02, y: 0.98},
+      }, {responsive: true});
+    },
+
+    // fetch POST + ReadableStream 解析 SSE (EventSource 不支持 POST body)
+    async postSse(url, body, onEvent, onDone, signal) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+        signal: signal || this.aborter.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({detail: res.statusText}));
+        throw new Error(err.detail || 'API错误');
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buf = '';
+      let result = null;
+      let streamError = null;
+      for (;;) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, {stream: true}).replace(/\r\n/g, '\n');
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          let ev = 'message';
+          let data = '';
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event:')) ev = line.slice(6).trim();
+            else if (line.startsWith('data:')) data += line.slice(5).trim();
+          }
+          if (!data) continue;
+          let parsed;
+          try { parsed = JSON.parse(data); } catch (e) { continue; }
+          if (ev === 'done') result = parsed;
+          else if (ev === 'error') streamError = new Error(parsed.error || '挖掘失败');
+          else if (onEvent) onEvent(ev, parsed);
+        }
+      }
+      if (streamError) throw streamError;
+      if (!result) throw new Error('未收到挖掘结果');
+      // 传入 onDone 时由调用方处理 done (如单因子评价), 否则走挖掘默认落结果区
+      if (onDone) { onDone(result); return result; }
+      // done: 落到结果区
+      this.progressPct = 100;
+      this.progressText = '完成, 共 ' + result.generations + ' 代, 候选 ' + (result.candidates || []).length + ' 个';
+      this.nStocks = result.n_stocks || 0;
+      this.candidates = result.candidates || [];
+      this.candSelected = [];
+      // A 档复核报告 (后端 mine_quantgp 外层产出, 未启用时为默认空值)
+      this.segments = result.segments || null;
+      this.oosReport = result.oos_report || [];
+      this.permReport = result.perm_report || [];
+      this.orthoInfo = result.ortho_info || null;
+      this.finalScreenReport = result.final_screen_report || null;
+      this.fdrReport = result.fdr_report || null;
+      if ((result.run_details || {}).generation && !this.curve.length) {
+        // 若进度事件缺失, 用 run_details 补全曲线
+        const rd = result.run_details;
+        this.curve = (rd.generation || []).map((g, i) => ({
+          gen: g,
+          best_fitness: rd.best_fitness[i],
+          avg_fitness: rd.average_fitness[i],
+          best_length: rd.best_length[i],
+          avg_length: rd.average_length[i],
+          time: rd.generation_time[i],
+        }));
+        this.drawCurve();
+      }
+      return result;
+    },
+
+    // ---- 入库 ----
+    toggleCand(i) {
+      const idx = this.candSelected.indexOf(i);
+      if (idx >= 0) this.candSelected.splice(idx, 1);
+      else this.candSelected.push(i);
+    },
+    toggleAll(checked) {
+      this.candSelected = checked ? (this.candidates || []).map((_, i) => i) : [];
+    },
+    async importOne(c) {
+      await this.doImport([c]);
+    },
+    async importSelected() {
+      const sel = this.candSelected.map(i => this.candidates[i]).filter(Boolean);
+      if (!sel.length) return;
+      await this.doImport(sel);
+    },
+    async doImport(list) {
+      try {
+        const r = await this.api('/api/factor/quantgp/import', {
+          method: 'POST',
+          body: JSON.stringify({
+            candidates: list.map(c => ({qg_expr: c.qg_expr, score: c.score})),
+            start_date: this.startDate,
+            end_date: this.endDate,
+            feature_names: this.featureNames.length ? this.featureNames : null,
+          }),
+        });
+        const imported = r.imported || [];
+        const skipped = r.skipped || [];
+        this.importSummary = '入库 ' + imported.length + ' 个, 跳过 ' + skipped.length + ' 个' +
+          (skipped.length ? ' (原因: ' + skipped.slice(0, 3).map(s => s.reason).join('; ') + ')' : '');
+        this.showToast('入库完成: ' + imported.length + ' 个', imported.length ? 'success' : 'error');
+      } catch (e) {
+        this.showToast('入库失败: ' + e.message, 'error');
+      }
+    },
+
+    // ---- 单因子评价 (训练结果下方新区域, 批量评价候选因子) ----
+    async runEvalSelected() {
+      if (this.mining || this.evalRunning || !this.candidates.length) return;
+      this.evalRunning = true;
+      this.evalResults = [];
+      this.evalProgress = '准备中...';
+      if (this.evalAborter) this.evalAborter.abort();
+      this.evalAborter = new AbortController();
+      try {
+        await this.postSse('/api/factor/quantgp/evaluate/stream', {
+          candidates: this.candidates.map(c => ({
+            qg_expr: c.qg_expr,
+            formula: c.formula || null,
+            score: c.score,
+          })),
+          pool_type: this.poolType,
+          pool_ref: this.poolRef,
+          start_date: this.startDate,
+          end_date: this.endDate,
+          rebal_period: this.rebalPeriod,
+          n_layers: 5,
+          feature_names: this.featureNames.length ? this.featureNames : null,
+        }, (ev, data) => {
+          if (ev === 'progress') {
+            const idx = data.index;
+            this.evalResults[idx] = data.candidate;
+            this.evalProgress = '评价中 (' + (data.index + 1) + '/' + data.total + ')';
+            this.$nextTick(() => this.renderEvalCharts(idx));
+          }
+        }, (done) => {
+          this.evalProgress = '';
+          this.evalRunning = false;
+          this.showToast('单因子评价完成: 共 ' + (done.total || 0) + ' 个候选', 'success');
+        }, this.evalAborter.signal);
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          this.evalProgress = '已取消';
+        } else {
+          this.evalProgress = '失败: ' + e.message;
+          this.showToast('单因子评价失败: ' + e.message, 'error');
+        }
+        this.evalRunning = false;
+      }
+    },
+
+    clearEval() {
+      if (this.evalRunning) return;
+      this.evalResults = [];
+      this.evalProgress = '';
+    },
+
+    // 清空 A 档复核报告 (仅清展示, 不影响挖掘)
+    clearAReport() {
+      this.segments = null;
+      this.oosReport = [];
+      this.permReport = [];
+      this.orthoInfo = null;
+      this.finalScreenReport = null;
+      this.fdrReport = null;
+    },
+
+    // 安全绘制 Plotly 图: 容器不可见(clientWidth<=0, 常见于 Alpine x-show 尚未应用)时,
+    // 等待后续动画帧布局稳定后再绘制, 避免 Plotly 拿不到有效容器宽度导致图表超宽盖住相邻图表。
+    _plotSafe(id, data, layout) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const tryDraw = (left) => {
+        if (el.clientWidth <= 0 && left > 0) {
+          requestAnimationFrame(() => tryDraw(left - 1));
+          return;
+        }
+        Plotly.purge(id);
+        Plotly.newPlot(id, data, layout, {responsive: true});
+      };
+      tryDraw(6);
+    },
+
+    // 渲染单个候选因子的 4 张评价图表 (IC时序 / 分层收益 / 分位收益 / PWC累计收益)
+    renderEvalCharts(idx) {
+      const ev = this.evalResults[idx];
+      if (!ev || !ev.ok) return;
+      // IC 时序
+      const ic = ev.ic_timeseries?.ic_series || [];
+      this._plotSafe('qgp-eval-ic-' + idx, [{
+        type: 'bar',
+        x: ic.map(d => d.date),
+        y: ic.map(d => d.ic || 0),
+        marker: {color: ic.map(d => (d.ic || 0) > 0 ? '#ef4444' : '#10b981')},
+      }], {
+        margin: {l: 56, r: 10, t: 10, b: 40},
+        bargap: 0.2,
+        xaxis: {type: 'date'},
+        yaxis: {title: {text: 'IC', standoff: 10}},
+      });
+      // 分层收益
+      const layers = ev.layered_backtest?.layer_returns || {};
+      const keys = Object.keys(layers).sort((a, b) => parseInt(a) - parseInt(b));
+      this._plotSafe('qgp-eval-layer-' + idx, [{
+        type: 'bar',
+        x: keys.map(k => 'L' + (parseInt(k) + 1)),
+        y: keys.map(k => layers[k]),
+        marker: {color: keys.map(k => parseInt(k) >= keys.length / 2 ? '#ef4444' : '#10b981')},
+      }], {
+        margin: {l: 64, r: 10, t: 10, b: 30},
+        bargap: 0.35,
+        xaxis: {title: '分层'},
+        yaxis: {title: {text: '未来' + this.rebalPeriod + '日收益率', standoff: 14}, tickformat: '.0%'},
+      });
+      // 分位收益
+      const qr = ev.quantile_backtest?.quantile_returns || [];
+      if (qr.length) {
+        this._plotSafe('qgp-eval-quantile-' + idx, [{
+          type: 'bar',
+          x: qr.map((_, i) => 'Q' + (i + 1)),
+          y: qr,
+          marker: {color: qr.map(v => v >= qr[qr.length - 1] ? '#ef4444' : '#10b981')},
+          text: qr.map(v => (v * 100).toFixed(1) + '%'),
+          textposition: 'outside',
+          cliponaxis: false,
+        }], {
+          margin: {l: 64, r: 10, t: 46, b: 30},
+          bargap: 0.35,
+          xaxis: {title: '分位组'},
+          yaxis: {title: {text: '年化收益', standoff: 14}, tickformat: '.0%', automargin: true},
+        });
+      }
+      // PWC 累计收益 (含成本)
+      const sr = ev.performance_with_cost?.strategy_return;
+      if (sr && sr.length) {
+        let cum = 0;
+        const cumRet = sr.map(d => { cum += (d.value || 0); return cum; });
+        this._plotSafe('qgp-eval-pwc-' + idx, [{
+          type: 'scatter', mode: 'lines',
+          x: sr.map(d => d.date),
+          y: cumRet,
+          line: {color: '#3b82f6', width: 2},
+          name: '累计因子收益',
+        }], {
+          margin: {l: 64, r: 10, t: 10, b: 30},
+          xaxis: {title: ''},
+          yaxis: {title: {text: '累计收益', standoff: 14}},
+        });
+      }
+    },
+
+    // ---- 数值格式化辅助 ----
+    icColor(v) {
+      if (v === null || v === undefined || isNaN(v)) return '';
+      return v > 0 ? 'text-red-600' : 'text-green-600';
+    },
+    fmtNum(v) {
+      if (v === null || v === undefined || isNaN(v)) return '-';
+      return Number(v).toFixed(4);
+    },
+    fmtPct(v) {
+      if (v === null || v === undefined || isNaN(v)) return '-';
+      return (v * 100).toFixed(2) + '%';
+    },
+  };
+}
+</script>

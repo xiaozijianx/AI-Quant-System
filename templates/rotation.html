@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}{{ rotation.label }}轮动 - AI 量化交易系统{% endblock %}
+
+{% block plotly %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ rotation.label }}轮动</h1>
+        <p class="page-subtitle">最近交易日{{ rotation.label }}排名热力图，颜色深浅反映{{ rotation.label }}强度</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-4" x-data="rotationApp()" x-init="init()" data-dimension="{{ rotation.key }}">
+    <!-- 状态与操作 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">状态</div>
+            <div class="card-subtitle" x-text="statusText"></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- 计算中状态条 -->
+            <template x-if="taskRunning">
+                <div class="flex items-center gap-3 flex-1 min-w-[240px]">
+                    <div class="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                    <div class="flex-1">
+                        <div class="text-sm" x-text="taskMessage"></div>
+                        <div class="h-2 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                            <div class="h-full bg-blue-600 transition-all duration-300"
+                                 :style="`width: ${taskProgressPct}%`"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" @click="stopTask()">停止</button>
+                </div>
+            </template>
+
+            <!-- 日期与区间选择 -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-1">
+                    <span class="text-xs text-gray-500">截止</span>
+                    <input type="date" class="form-input text-xs py-1 px-2" style="width: 130px;"
+                           x-model="endDate" :disabled="taskRunning || loading"/>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button class="btn btn-sm" :class="days === 5 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="taskRunning || loading" @click="setDays(5)">5日</button>
+                    <button class="btn btn-sm" :class="days === 10 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="taskRunning || loading" @click="setDays(10)">10日</button>
+                    <button class="btn btn-sm" :class="days === 20 ? 'btn-primary' : 'btn-secondary'"
+                            :disabled="taskRunning || loading" @click="setDays(20)">20日</button>
+                </div>
+                <button class="btn btn-sm btn-primary" :disabled="taskRunning || loading" @click="loadMatrix()">查询</button>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex items-center gap-2">
+                <button class="btn btn-primary" :disabled="taskRunning" @click="refreshToday()">
+                    刷新今日
+                </button>
+                <button class="btn btn-secondary" :disabled="taskRunning" @click="rebuildSelected()">
+                    重建选中区间
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主体：热力图 + 明细 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- 左侧热力图 -->
+        <div class="lg:col-span-2 card">
+            <div class="card-header">
+                <div class="card-title">{{ rotation.label }}排名热力图</div>
+                <div class="card-subtitle">
+                    行 = 排名位次，列 = 交易日，颜色越深表示{{ rotation.label }}强度越高
+                </div>
+            </div>
+
+            <div x-show="!hasData && !loading" class="text-gray-500 py-8 text-center">
+                {% if rotation.key == 'sector' %}暂无板块轮动数据{% else %}暂无数据{% endif %}，请点击“刷新今日”或“重建最近 20 日”开始计算。
+            </div>
+
+            <div x-show="loading" class="text-gray-500 py-8 text-center">
+                正在加载数据...
+            </div>
+
+            <div x-show="hasData" class="overflow-x-auto">
+                <table class="min-w-full text-xs">
+                    <thead>
+                        <tr>
+                            <th class="px-2 py-1 bg-gray-100 sticky left-0 z-10">排名</th>
+                            <template x-for="date in dates" :key="date">
+                                <th class="px-2 py-1 bg-gray-100 text-center min-w-[90px]" x-text="formatDate(date)"></th>
+                            </template>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="rank in ranks" :key="rank">
+                            <tr>
+                                <td class="px-2 py-1 bg-gray-50 font-medium text-center sticky left-0 z-10"
+                                    x-text="rank"></td>
+                                <template x-for="date in dates" :key="date">
+                                    <td>
+                                        <div class="px-1 py-1 text-center cursor-pointer hover:ring-2 hover:ring-blue-400 rounded transition-all"
+                                             :class="{'ring-2 ring-blue-500': isSelected(date, rank)}"
+                                             :style="cellStyle(date, rank)"
+                                             @click="selectCell(date, rank)">
+                                            {% if rotation.key == 'sector' %}
+                                            <div x-text="cellLabel(date, rank)"></div>
+                                            {% else %}
+                                            <div class="font-medium leading-tight" x-text="cellLabel(date, rank)"></div>
+                                            <div class="text-[10px] opacity-75 leading-tight" x-text="cellSubLabel(date, rank)"></div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </template>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 右侧明细 -->
+        <div class="lg:col-span-1 card">
+            <div class="card-header">
+                <div class="card-title">{{ rotation.label }}明细</div>
+                <div class="card-subtitle" x-text="detailSubtitle">点击左侧格子查看详情</div>
+            </div>
+
+            <div x-show="!selected" class="text-gray-500 py-8 text-center text-sm">
+                点击左侧热力图中的某个{{ rotation.label }}，查看该{{ rotation.label }}当日的详细指标与近期走势。
+            </div>
+
+            <div x-show="selected">
+                <!-- 相关性最高的 5 只股票 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-600 mb-2">相关性最高的股票</div>
+                    <div class="space-y-1.5">
+                        <template x-for="(s, idx) in relevantStocks" :key="s.code">
+                            <div class="flex items-center justify-between bg-gray-50 rounded px-2 py-1.5">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-xs text-gray-400 w-4" x-text="idx + 1"></span>
+                                    <span class="text-xs font-medium truncate" x-text="s.name || s.code"></span>
+                                    <span class="text-[10px] text-gray-500 font-mono" x-text="s.code"></span>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="text-[10px] text-gray-500 font-mono" x-text="'相关 ' + (s.total_score !== null ? s.total_score.toFixed(2) : '-')"></span>
+                                    <button class="btn btn-xs btn-secondary" @click="openStockDetail(s.code, s.name, selected.date)">个股详情</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 核心指标 -->
+                <div class="space-y-3 mb-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">强度得分</span>
+                        <span class="font-mono font-medium" x-text="fmt(detail.score)"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">综合得分</span>
+                        <span class="font-mono font-medium" x-text="fmt(detail.composite_score)"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">排名 / 综合排名</span>
+                        <span class="font-mono font-medium">
+                            <span x-text="detail.rank"></span> / <span x-text="detail.composite_rank"></span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">轮动象限</span>
+                        <span class="badge"
+                              :class="phaseClass(detail.phase)"
+                              x-text="detail.phase_desc || detail.phase"></span>
+                    </div>
+                    {% if rotation.key == 'concept' %}
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">来源前缀</span>
+                        <span class="font-mono text-xs" x-text="detail.source_prefix || '-'"></span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- 历史排名图 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-600 mb-1">近期排名走势</div>
+                    <div id="rankChart" style="height: 240px;"></div>
+                </div>
+
+                <!-- 指数走势图 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-600 mb-1">{{ rotation.label }}指数走势 (近 {{ rotation.index_years_default }} 年)</div>
+                    <div id="indexChart" style="height: 240px;"></div>
+                </div>
+
+                <!-- 指标列表 -->
+                <div class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                    <template x-for="field in detailFields" :key="field">
+                        <div class="bg-gray-50 rounded p-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-600" x-text="notes[field]?.name || field"></span>
+                                <span class="font-mono text-xs" x-text="fmt(detail[field])"></span>
+                            </div>
+                            <div class="text-xs text-gray-400 mt-0.5" x-text="notes[field]?.note || ''"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/rotation/app.js?v={{ app_ver }}"></script>
+{% endblock %}

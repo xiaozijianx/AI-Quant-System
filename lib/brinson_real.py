@@ -558,7 +558,7 @@ def compute_real_brinson(start: str, end: str,
         return {"ok": False, "message": "基准侧权重为空 (沪深300 数据缺失?)"}
 
     # 6) 调 24 章 brinson_attribution
-    from attribution.brinson import brinson_attribution
+    from services.review.attribution.brinson import brinson_attribution
     res = brinson_attribution(
         portfolio_weights=Wp,
         benchmark_weights=Wb,
@@ -647,7 +647,7 @@ def compute_brinson_from_trades(csv_path: str,
 
     # 1) 加载交割单
     try:
-        from attribution.trade_record import load_from_csv
+        from services.review.attribution.trade_record import load_from_csv
         trades_df = load_from_csv(str(csv_path))
     except Exception as e:
         return {"ok": False, "message": f"加载 CSV 失败: {type(e).__name__}: {e}"}
@@ -682,7 +682,7 @@ def compute_brinson_from_trades(csv_path: str,
         return {"ok": False, "message": "基准侧权重为空 (沪深300 数据缺失?)"}
 
     # 6) 调核心 brinson_attribution
-    from attribution.brinson import brinson_attribution
+    from services.review.attribution.brinson import brinson_attribution
     res = brinson_attribution(
         portfolio_weights=Wp,
         benchmark_weights=Wb,

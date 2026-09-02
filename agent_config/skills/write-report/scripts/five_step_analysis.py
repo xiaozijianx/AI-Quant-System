@@ -11,7 +11,7 @@
 
 用法：
     python five_step_analysis.py --index_dir <索引目录> --stock_name <公司名称> --output_dir <输出目录>
-    python five_step_analysis.py --index_dir data/vector_db --stock_name 贵州茅台 --output_dir output/
+    python five_step_analysis.py --index_dir data/vector_db --stock_name 贵州茅台 --output_dir outputs/analysis/
     python five_step_analysis.py --index_dir data/vector_db --stock_name 贵州茅台 --focus catalyst
 """
 
@@ -230,7 +230,7 @@ def main():
     parser = argparse.ArgumentParser(description="国泰君安五步法分析引擎")
     parser.add_argument("--index_dir", required=True, help="FAISS 索引目录")
     parser.add_argument("--stock_name", required=True, help="公司名称（如：贵州茅台）")
-    parser.add_argument("--output_dir", default="./output", help="输出目录（默认 ./output）")
+    parser.add_argument("--output_dir", default="./outputs/analysis", help="输出目录（默认 ./outputs/analysis）")
     parser.add_argument("--model", default="deepseek-v3", help="LLM 模型（默认 deepseek-v3）")
     parser.add_argument(
         "--focus",

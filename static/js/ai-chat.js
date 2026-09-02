@@ -2035,7 +2035,7 @@ const AI_CHAT = {
             });
             const data = await resp.json();
             if (data.status !== 'ok') {
-                alert(data.message || '回滚失败');
+                App.toast(data.message || '回滚失败', 'danger');
                 return;
             }
             // 前端同步截断 conv.messages（找到第 userIndex 条用户消息并删除其及之后）
@@ -2057,7 +2057,7 @@ const AI_CHAT = {
             this.renderMessages();
             this._showToast('已回滚到该提问之前的状态');
         } catch (err) {
-            alert('回滚请求失败: ' + err.message);
+            App.toast('回滚请求失败: ' + err.message, 'danger');
         }
     },
 
@@ -2413,7 +2413,7 @@ const AI_CHAT = {
      */
     async _showKanbanPanel() {
         if (!this.currentConvId) {
-            alert('请先选择一个对话');
+            App.toast('请先选择一个对话', 'warn');
             return;
         }
 
@@ -2675,7 +2675,7 @@ const AI_CHAT = {
      */
     async _showCheckpointPanel() {
         if (!this.currentConvId) {
-            alert('请先选择一个对话');
+            App.toast('请先选择一个对话', 'warn');
             return;
         }
 
@@ -2845,10 +2845,10 @@ const AI_CHAT = {
                 this._showToast(data.message || '已仅回滚消息');
                 this.renderMessages();
             } else {
-                alert('仅消息回滚失败: ' + (data.message || '未知错误'));
+                App.toast('仅消息回滚失败: ' + (data.message || '未知错误'), 'danger');
             }
         } catch(err) {
-            alert('仅消息回滚请求失败: ' + err.message);
+            App.toast('仅消息回滚请求失败: ' + err.message, 'danger');
         }
     },
 
@@ -2877,10 +2877,10 @@ const AI_CHAT = {
             if (data.status === 'ok') {
                 this._showToast(data.message || '已回滚文件状态');
             } else {
-                alert('文件回滚失败: ' + (data.message || '未知错误'));
+                App.toast('文件回滚失败: ' + (data.message || '未知错误'), 'danger');
             }
         } catch(err) {
-            alert('文件回滚请求失败: ' + err.message);
+            App.toast('文件回滚请求失败: ' + err.message, 'danger');
         }
     },
 
@@ -2894,7 +2894,7 @@ const AI_CHAT = {
         const panel = document.getElementById('checkpoint-panel');
         if (!panel) return;
         if (!this.currentConvId) {
-            alert('请先选择一个对话');
+            App.toast('请先选择一个对话', 'warn');
             return;
         }
         panel.innerHTML = '<div class="checkpoint-loading">加载文件快照...</div>';
@@ -2959,10 +2959,10 @@ const AI_CHAT = {
                 this._showToast(data.message || '已回滚文件状态');
                 this._showFileCheckpoints();
             } else {
-                alert('文件回滚失败: ' + (data.message || '未知错误'));
+                App.toast('文件回滚失败: ' + (data.message || '未知错误'), 'danger');
             }
         } catch(err) {
-            alert('文件回滚请求失败: ' + err.message);
+            App.toast('文件回滚请求失败: ' + err.message, 'danger');
         }
     },
 
@@ -2991,12 +2991,12 @@ const AI_CHAT = {
                 const panel = document.getElementById('checkpoint-panel');
                 if (panel) panel.remove();
                 // 提示用户
-                alert(data.message + '\n\n注意：前端对话记录保持不变，但后端 agent 上下文已回滚。下次对话将从回滚点继续。');
+                App.toast(data.message + '\n\n注意：前端对话记录保持不变，但后端 agent 上下文已回滚。下次对话将从回滚点继续。', 'success');
             } else {
-                alert('回滚失败: ' + (data.message || '未知错误'));
+                App.toast('回滚失败: ' + (data.message || '未知错误'), 'danger');
             }
         } catch(err) {
-            alert('回滚请求失败: ' + err.message);
+            App.toast('回滚请求失败: ' + err.message, 'danger');
         }
     },
 

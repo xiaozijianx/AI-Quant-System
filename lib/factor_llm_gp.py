@@ -258,7 +258,9 @@ def _validate_gene(expr: str, panel: Dict[str, pd.DataFrame],
 
     1. 语法闸: validate_expression 校验 DSL 合法
     2. 节点数闸: 解析统计 tree_size, 超过 max_length 拒绝 (对齐 GP 主线 P4, 防超长因子注入)
-    3. 求值闸: evaluate_expression 求值非空且非空率 >= 5%
+    3. 求值闸: evaluate_expression 求值非空且非空率 >= 20%
+        (门槛 0.2: 除零病态公式(ts_VAR 产生 0 后 ts_PctChange)非空率仅 ~5%,
+         有效截面过少时 RankIC 虚高, 直接拒绝注入; 对齐 GP 主线非空率硬门槛)
     4. 去重闸: 表达式哈希未在注册表出现
     """
     if not expr or len(expr) > 200:
@@ -282,7 +284,8 @@ def _validate_gene(expr: str, panel: Dict[str, pd.DataFrame],
         return False
     if fv is None or len(fv) == 0 or fv.dropna(how="all").empty:
         return False
-    if float(fv.notna().mean().mean()) < 0.05:
+    # 求值闸: 非空率硬门槛 0.2 (对齐 GP 主线 fitness_expr, 拦截除零病态公式)
+    if float(fv.notna().mean().mean()) < 0.2:
         return False
     seen_hashes.add(h)
     return True

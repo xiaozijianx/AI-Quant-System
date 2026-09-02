@@ -92,13 +92,13 @@ Step 1 数据收集完成后，直接在对话中输出 Markdown 格式研报正
   - `source_pages`（可选）：该步骤来源页码列表
 
 ```bash
-python agent_config/skills/write-report/scripts/report_generator.py --analysis_file <整理后的分析结果JSON> --output_dir output/reports/ --format html
+python agent_config/skills/write-report/scripts/report_generator.py --analysis_file <整理后的分析结果JSON> --output_dir outputs/reports/ --format html
 ```
 
 参数说明：
 
 - `--analysis_file`（必填）：按上述 JSON 结构整理的分析结果文件路径（由你根据 Step 2 正文整理生成。）
-- `--output_dir`（可选）：研报输出目录，默认 `./output/reports`
+- `--output_dir`（可选）：研报输出目录，默认 `./outputs/reports`
 - `--format`（可选）：研报输出格式，取值 `md` / `html` / `both`，默认 `md`。`html` 输出自包含样式的 HTML 文件（浏览器直接打开即可阅读），`both` 同时输出 Markdown 与 HTML。
 
 ## Script Reference

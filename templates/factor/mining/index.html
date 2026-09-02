@@ -1,0 +1,39 @@
+  <!-- ==================== Tab 3: 因子挖掘 ==================== -->
+  <div x-show="activeTab === 'mining'" class="space-y-4">
+    <!-- 子Tab -->
+    <div class="flex gap-2">
+      <button @click="miningSubTab = 'ml'"
+              :class="miningSubTab === 'ml' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'"
+              class="px-3 py-1.5 text-sm rounded shadow-sm">ML 特征重要性</button>
+      <button @click="miningSubTab = 'gp'"
+              :class="miningSubTab === 'gp' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'"
+              class="px-3 py-1.5 text-sm rounded shadow-sm">GP 自动生成</button>
+      <button @click="miningSubTab = 'quantgp'"
+              :class="miningSubTab === 'quantgp' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'"
+              class="px-3 py-1.5 text-sm rounded shadow-sm">QuantGP 复刻</button>
+      <button @click="miningSubTab = 'svd'"
+              :class="miningSubTab === 'svd' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'"
+              class="px-3 py-1.5 text-sm rounded shadow-sm">SVD 分析</button>
+      <button @click="miningSubTab = 'llm_gp'"
+              :class="miningSubTab === 'llm_gp' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'"
+              class="px-3 py-1.5 text-sm rounded shadow-sm">LLM增强GP</button>
+      <button @click="miningSubTab = 'rl'"
+              :class="miningSubTab === 'rl' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'"
+              class="px-3 py-1.5 text-sm rounded shadow-sm">RL 强化学习</button>
+    </div>
+
+    <!-- ML -->
+  <!-- ==================== ML 特征重要性 (独立子模板) ==================== -->
+  {% include "factor/mining/ml.html" %}
+  <!-- ==================== GP 自动生成 (独立子模板) ==================== -->
+  {% include "factor/mining/gp.html" %}
+    <div x-show="miningSubTab === 'quantgp'" class="space-y-2">
+      {% include "quant_gp.html" %}
+    </div>
+  <!-- ==================== RL 强化学习因子挖掘 (独立子模板) ==================== -->
+  {% include "factor/mining/rl.html" %}
+  <!-- ==================== LLM 增强 GP 独立分析 (阶段6.2, 挖掘页内层子Tab) ==================== -->
+  <!-- ==================== LLM 增强 GP (独立子模板) ==================== -->
+  {% include "factor/mining/llm_gp.html" %}
+  <!-- ==================== SVD 分析 (独立子模板) ==================== -->
+  {% include "factor/mining/svd.html" %}

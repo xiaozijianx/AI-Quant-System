@@ -670,7 +670,7 @@ def strat_ml_prob(code: str, market, capital: float) -> dict:
         return _hold("ml_prob", f"日 K 不足 200 根 (ML 需要训练样本, 当前 {0 if df is None else len(df)})")
 
     try:
-        from ml_strategy.ml_prob_runner import run_ml_prob
+        from lib.ml_strategy.ml_prob_runner import run_ml_prob
         out = run_ml_prob(
             df,
             train_days=120,

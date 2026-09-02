@@ -18,7 +18,8 @@ from dotenv import dotenv_values
 # 项目根目录
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
-SQL_FILE = PROJECT_ROOT / "sql" / "sector_rotation_schema.sql"
+# SQL schema 与本脚本同在 scripts/ 下 (scripts/sql/, 自根目录 sql/ 合并而来)
+SQL_FILE = Path(__file__).resolve().parent / "sql" / "sector_rotation_schema.sql"
 
 
 def _load_env() -> dict:

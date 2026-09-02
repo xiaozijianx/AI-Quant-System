@@ -151,23 +151,33 @@ def layered_monotonicity(factor: torch.Tensor, future_ret: torch.Tensor,
 
 
 def build_walk_forward_folds(T: int, n_folds: int = 4, gap: int = 20):
-    """构建 walk-forward 折叠 (滚动窗口, 复刻原版 engine._build_walk_forward_folds)
+    """构建 walk-forward 折叠 (逐位复刻原版 engine._build_walk_forward_folds)
 
-    第 k 折 (k=1..n_folds): 训练段 = [(k-1)*fold_size, k*fold_size),
-    验证段 = [train_end + gap, min(train_end + gap + fold_size, T))。
-    数据不足以切 2 折以上时退化为单折全量 ([(0,T), []], 表示无独立验证段)。
+    原版逻辑:
+      fold_size = T // n_folds
+      当 total_required = fold_size*n_folds + gap*(n_folds-1) > T 时,
+        把 gap 缩小到 (T - fold_size*n_folds) // n_folds
+      然后 k = 1..n_folds-1 生成 n_folds-1 折:
+        train = [(k-1)*fold_size, k*fold_size)
+        val   = [k*fold_size + gap, min(val_start + fold_size, T))
+      数据不足时退化为全量单折。
     """
-    if n_folds < 2 or T < n_folds * 3 or gap <= 0:
+    if n_folds < 2 or T < 2:
         return [(list(range(T)), [])]
-    per_fold = max(2, (T - gap * n_folds) // (n_folds + 1))
+    fold_size = T // n_folds
+    if fold_size < 2:
+        return [(list(range(T)), [])]
+    total_required = fold_size * n_folds + gap * (n_folds - 1)
+    if total_required > T:
+        gap = max(0, (T - fold_size * n_folds) // n_folds)
     folds = []
-    for k in range(1, n_folds + 1):
-        train_start = (k - 1) * per_fold
-        train_end = k * per_fold
+    for k in range(1, n_folds):
+        train_start = (k - 1) * fold_size
+        train_end = k * fold_size
         val_start = train_end + gap
-        val_end = min(val_start + per_fold, T)
-        if train_end <= train_start or val_end <= val_start:
-            continue
+        val_end = min(val_start + fold_size, T)
+        if val_start >= T or val_end <= val_start:
+            break
         folds.append((list(range(train_start, train_end)), list(range(val_start, val_end))))
     if not folds:
         return [(list(range(T)), [])]

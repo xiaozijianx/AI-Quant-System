@@ -81,13 +81,21 @@ def op_gate(cond: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tenso
 
 
 def op_jump(a: torch.Tensor) -> torch.Tensor:
-    """因果 expanding zscore + tanh 软化 (降低稀疏度)"""
-    mean = a.cumsum(dim=1) / torch.arange(1, a.shape[1] + 1, dtype=a.dtype, device=a.device).unsqueeze(0)
-    sq = (a * a).cumsum(dim=1) / torch.arange(1, a.shape[1] + 1, dtype=a.dtype, device=a.device).unsqueeze(0)
-    var = (sq - mean * mean).clamp_min(0.0)
-    std = var.sqrt().clamp_min(1e-8)
+    """因果 expanding zscore + tanh 软化 (与原版 JUMP 完全一致, 含 warm-up 5)"""
+    N, T = a.shape
+    cnt = torch.arange(1, T + 1, dtype=a.dtype, device=a.device).view(1, T)
+    cumsum = a.cumsum(dim=1)
+    mean = cumsum / cnt
+    cumsum_sq = (a * a).cumsum(dim=1)
+    var = (cumsum_sq / cnt) - mean * mean
+    std = var.clamp(min=1e-12).sqrt() + 1e-6
     z = (a - mean) / std
-    return _nan_to_num(torch.tanh(z - 1.5))
+    out = torch.tanh(z - 1.5)
+    min_warmup = 5
+    if T > min_warmup:
+        warmup_mask = torch.arange(T, device=a.device) < min_warmup
+        out[:, warmup_mask] = 0.0
+    return _nan_to_num(out)
 
 
 def op_decay(a: torch.Tensor) -> torch.Tensor:
@@ -121,19 +129,19 @@ def _ts_mean(x: torch.Tensor, d: int) -> torch.Tensor:
 
 
 def _ts_std(x: torch.Tensor, d: int) -> torch.Tensor:
+    """因果滚动标准差 (ddof=0, 与原版 TS_STD 完全一致, 下界 +1e-6)"""
     w = _ts_rolling(x, d)
-    return _nan_to_num(w.std(dim=-1, unbiased=False).clamp_min(1e-8))
+    m = w.mean(dim=-1, keepdim=True)
+    std = ((w - m) ** 2).mean(dim=-1).sqrt() + 1e-6
+    return _nan_to_num(std)
 
 
 def _ts_rank(x: torch.Tensor, d: int) -> torch.Tensor:
-    """窗口内当前值排名归一化到 [0,1] (取窗口内最后一个位置)"""
+    """窗口内当前值的分位数 (严格小于比例, 值域 [0,1), 与原版 TS_RANK 完全一致)"""
     w = _ts_rolling(x, d)  # [N, T, d]
-    sorted_idx = w.argsort(dim=-1)
-    ranks = torch.empty_like(sorted_idx, dtype=torch.float)
-    arange = torch.arange(d, device=x.device).float().view(1, 1, d)
-    ranks.scatter_(-1, sorted_idx, arange.expand_as(sorted_idx))
-    cur_rank = ranks[..., -1]
-    return _nan_to_num(cur_rank / max(d - 1, 1))
+    cur = w[..., -1:]
+    rank = (w < cur).float().mean(dim=-1)
+    return _nan_to_num(rank)
 
 
 def _ts_sum(x: torch.Tensor, d: int) -> torch.Tensor:
@@ -149,10 +157,14 @@ def _ts_min(x: torch.Tensor, d: int) -> torch.Tensor:
 
 
 def _ts_zscore(x: torch.Tensor, d: int) -> torch.Tensor:
+    """因果滚动 z-score (与原版 TS_ZSCORE 完全一致)"""
     w = _ts_rolling(x, d)
-    mean = w.mean(dim=-1, keepdim=True)
-    std = w.std(dim=-1, unbiased=False, keepdim=True).clamp_min(1e-8)
-    return _nan_to_num((x - mean.squeeze(-1)) / std.squeeze(-1))
+    m = w.mean(dim=-1, keepdim=True)
+    s = ((w - m) ** 2).mean(dim=-1, keepdim=True).sqrt() + 1e-9
+    z = (x - m.squeeze(-1)) / s.squeeze(-1)
+    mask = (s.squeeze(-1) < 2e-9)
+    z = torch.where(mask, torch.zeros_like(z), z)
+    return _nan_to_num(z)
 
 
 def _ts_corr(x: torch.Tensor, y: torch.Tensor, d: int) -> torch.Tensor:
@@ -186,10 +198,10 @@ def _ts_quantile(x: torch.Tensor, d: int) -> torch.Tensor:
 
 
 def _ts_skew(x: torch.Tensor, d: int) -> torch.Tensor:
-    """d 期偏度 (三阶矩标准化), 捕捉分布非对称性"""
+    """d 期偏度 (三阶矩标准化), 与原版 TS_SKEW 完全一致"""
     w = _ts_rolling(x, d)
     m = w.mean(dim=-1, keepdim=True)
-    s = ((w - m) ** 2).mean(dim=-1).sqrt().clamp_min(1e-8)
+    s = ((w - m) ** 2).mean(dim=-1).sqrt() + 1e-6
     skew = ((w - m) ** 3).mean(dim=-1) / (s ** 3)
     return _nan_to_num(skew)
 
@@ -238,11 +250,17 @@ def _ts_decay_linear(x: torch.Tensor, d: int) -> torch.Tensor:
     return _nan_to_num((w * weights).sum(dim=-1))
 
 
-def _ts_decay_exp(x: torch.Tensor, d: int) -> torch.Tensor:
-    """指数衰减加权平均"""
-    weights = torch.exp(-torch.arange(d, dtype=x.dtype, device=x.device).flip(0) / max(d, 1))
-    weights = weights / weights.sum()
+def _op_decay(x: torch.Tensor) -> torch.Tensor:
+    """原版 DECAY: 归一化 3 期固定衰减 [1.0, 0.8, 0.6] / 2.4"""
+    return _nan_to_num((x + 0.8 * _ts_delay(x, 1) + 0.6 * _ts_delay(x, 2)) / 2.4)
+
+
+def _ts_decay_exp(x: torch.Tensor, d: int, alpha: float = 0.5) -> torch.Tensor:
+    """原版 TS_DECAY_EXP_5: alpha*(1-alpha)^i 指数衰减加权"""
     w = _ts_rolling(x, d)
+    weights = torch.tensor([alpha * (1.0 - alpha) ** i for i in range(d)],
+                           dtype=x.dtype, device=x.device)
+    weights = weights / weights.sum()
     return _nan_to_num((w * weights).sum(dim=-1))
 
 
@@ -273,8 +291,9 @@ def _ts_log(x: torch.Tensor) -> torch.Tensor:
 # ============================================================
 
 def op_power(a: torch.Tensor, p: float = 2.0) -> torch.Tensor:
-    """带符号乘方: sign(x)*|x|^p"""
-    return _nan_to_num(torch.sign(a) * torch.abs(a) ** p)
+    """带符号乘方: sign(x)*|x|^p (与原版 SIGNED_POWER_2 一致, clamp 防溢出)"""
+    out = torch.sign(a) * torch.abs(a) ** p
+    return torch.nan_to_num(out.clamp(-1e9, 1e9), nan=0.0, posinf=0.0, neginf=0.0)
 
 
 def op_max2(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -300,7 +319,8 @@ def op_clip(a: torch.Tensor, lo: float = -3.0, hi: float = 3.0) -> torch.Tensor:
 
 
 def op_sigmoid(a: torch.Tensor) -> torch.Tensor:
-    return _nan_to_num(torch.sigmoid(a))
+    """原版 SIGMOID: 2*sigmoid(x)-1, 输出 [-1,1]"""
+    return _nan_to_num(2.0 * torch.sigmoid(a) - 1.0)
 
 
 def op_tanh_squash(a: torch.Tensor) -> torch.Tensor:
@@ -312,8 +332,17 @@ def op_if_gt(cond: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tens
     return _nan_to_num(mask * x + (1.0 - mask) * y)
 
 
-def op_winsorize(a: torch.Tensor, lo: float = -3.0, hi: float = 3.0) -> torch.Tensor:
-    return _nan_to_num(a.clamp(lo, hi))
+def op_winsorize(a: torch.Tensor, lo: float = 0.05, hi: float = 0.95) -> torch.Tensor:
+    """原版 WINSORIZE: 20 期因果滚动分位裁剪 (5%/95%)"""
+    w = 20
+    windows = _ts_rolling(a, w).float()
+    lower = torch.quantile(windows, lo, dim=-1).to(a.dtype)
+    upper = torch.quantile(windows, hi, dim=-1).to(a.dtype)
+    span = upper - lower
+    safe_lower = torch.where(span < 1e-9, a, lower)
+    safe_upper = torch.where(span < 1e-9, a, upper)
+    out = torch.clamp(a, safe_lower, safe_upper)
+    return torch.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
 
 
 # ============================================================
@@ -321,14 +350,28 @@ def op_winsorize(a: torch.Tensor, lo: float = -3.0, hi: float = 3.0) -> torch.Te
 # ============================================================
 
 def op_cs_rank(x: torch.Tensor) -> torch.Tensor:
-    """截面排名 (逐时间步跨股票, 归一化到 [0,1])"""
+    """截面排名 (逐时间步跨股票, 归一化到 [0,1], N=1 恒等退化)"""
     if x.shape[0] <= 1:
-        return _nan_to_num(x)
+        return torch.nan_to_num(x, nan=0.5, posinf=0.5, neginf=0.5)
     sorted_idx = x.argsort(dim=0)
     ranks = torch.empty_like(sorted_idx, dtype=torch.float)
     arange = torch.arange(x.shape[0], device=x.device).float().unsqueeze(1)
     ranks.scatter_(0, sorted_idx, arange.expand_as(sorted_idx))
     return _nan_to_num(ranks / max(x.shape[0] - 1, 1))
+
+
+def op_cs_scale(x: torch.Tensor) -> torch.Tensor:
+    """原版 CS_SCALE: 截面 min-max 缩放到 [0,1], N=1 恒等退化"""
+    if x.shape[0] <= 1:
+        return torch.nan_to_num(x, nan=0.5, posinf=0.5, neginf=0.5)
+    mn = x.min(dim=0, keepdim=True).values
+    mx = x.max(dim=0, keepdim=True).values
+    span = mx - mn
+    zero_span = span.abs() < 1e-9
+    span_safe = torch.where(zero_span, torch.ones_like(span), span)
+    out = (x - mn) / span_safe
+    out = torch.where(zero_span.expand_as(out), torch.full_like(out, 0.5), out)
+    return torch.nan_to_num(out, nan=0.5, posinf=0.5, neginf=0.5)
 
 
 def op_cs_demean(x: torch.Tensor) -> torch.Tensor:
@@ -391,8 +434,8 @@ OPERATOR_REGISTRY = {
     "ts_Min_10": (lambda x: _ts_min(x, 10), 1),
     "ts_Min_20": (lambda x: _ts_min(x, 20), 1),
     "ts_Delta_5": (lambda x: _ts_delta(x, 5), 1),
-    "ts_Decay_5": (lambda x: _ts_decay_exp(x, 5), 1),
-    "ts_DecayExp_5": (lambda x: _ts_decay_exp(x, 5), 1),
+    "ts_Decay_5": (_op_decay, 1),
+    "ts_DecayExp_5": (lambda x: _ts_decay_exp(x, 5, 0.5), 1),
     "ts_ArgMax_5": (lambda x: _ts_argmax(x, 5), 1),
     "ts_ArgMin_5": (lambda x: _ts_argmin(x, 5), 1),
     "ts_ArgMax_10": (lambda x: _ts_argmax(x, 10), 1),
@@ -417,31 +460,33 @@ OPERATOR_REGISTRY = {
     # 截面 (arity 1)
     "cs_Rank": (op_cs_rank, 1),
     "cs_Demean": (op_cs_demean, 1),
+    "cs_Scale": (op_cs_scale, 1),
     "cs_Zscore": (op_cs_zscore, 1),
     "cs_TransNorm": (op_cs_transnorm, 1),
 }
 
 # 恒正算子 (输出值域非负, 连续使用丢失符号信息)
-POSITIVE_ONLY_OPS = {"ts_Rank_5", "ts_Rank_10", "ts_Rank_20", "abs", "sigmoid", "cs_Rank",
-                     "ts_ArgMax_5", "ts_ArgMin_5", "ts_ArgMax_10", "ts_ArgMin_10",
-                     "ts_Quantile_10"}
+POSITIVE_ONLY_OPS = {"ts_Rank_5", "ts_Rank_10", "ts_Rank_20", "abs"}
 
 # 恒正传播算子 (在恒正输入上输出仍恒正)
 INFECTED_PROPAGATING_OPS = {
-    "ts_Mean_5", "ts_Mean_10", "ts_Mean_20", "ts_Sum_5", "ts_Sum_10", "ts_Sum_20",
-    "ts_Max_10", "ts_Max_20", "ts_Min_10", "ts_Min_20", "clip", "sqrt", "power",
-    "signed_log", "sigmoid", "tanh_squash", "winsorize", "ts_Decay_5", "ts_DecayExp_5",
-    "ts_Product_5", "ts_Scale", "ts_Log", "ts_EMA_5", "ts_EMA_20", "wma",
-    "ts_DecayLinear_5",
+    "ts_Rank_5", "ts_Rank_10", "ts_Rank_20", "abs",
+    "ts_Mean_5", "ts_Mean_10", "ts_Mean_20",
+    "ts_Sum_5", "ts_Sum_10", "ts_Sum_20",
+    "ts_Max_10", "ts_Max_20",
+    "clip", "sqrt", "power", "signed_log", "sigmoid", "tanh_squash", "winsorize",
+    "wma", "ts_EMA_5", "ts_EMA_20",
+    "ts_Decay_5", "ts_DecayExp_5", "ts_DecayLinear_5",
 }
 
 # 符号恢复算子 (能恢复符号信息)
 SIGN_RESTORE_OPS = {
-    "sub", "div", "neg", "gate", "if_gt", "cs_Demean", "cs_Zscore", "cs_Rank",
-    "cs_TransNorm", "ts_Stdev_5", "ts_Stdev_10", "ts_Stdev_20", "ts_Corr_10",
-    "ts_Delta_5", "jump", "sign", "max3", "signed_log", "power", "sqrt",
-    "ts_Zscore_10", "ts_Zscore_20", "ts_Skew_10", "momentum_5", "momentum_10",
-    "delta", "ts_Cov_10",
+    "sub", "div", "neg", "gate", "if_gt",
+    "ts_Zscore_10", "ts_Zscore_20",
+    "cs_Demean", "cs_Rank", "cs_Scale",
+    "ts_Stdev_5", "ts_Stdev_10", "ts_Stdev_20",
+    "ts_Corr_10", "ts_Skew_10", "ts_Quantile_10",
+    "delta", "ts_Delta_5", "momentum_5", "momentum_10",
 }
 
 # 算子名称列表 (有序, 供词表派生)
@@ -450,39 +495,40 @@ OPERATOR_NAMES = list(OPERATOR_REGISTRY.keys())
 # 解码映射: 算子名 -> 本系统参数化表达式模板 (x 为操作数占位)
 # 用于把 RL 表达式解码为本系统引擎可求值的形式
 DECODE_MAP = {
-    "add": "({a} + {b})", "sub": "({a} - {b})", "mul": "({a} * {b})", "div": "({a} / {b})",
+    "add": "({a} + {b})", "sub": "({a} - {b})", "mul": "({a} * {b})", "div": "(({a}) / (({b}) + 0.000001))",
     "neg": "((-1) * ({a}))", "abs": "abs({a})", "sign": "sign({a})",
-    "gate": "gate({a}, {b}, {c})", "jump": "jump({a})", "max3": "max3({a})",
+    "gate": "gate({a}, {b}, {c})", "jump": "ts_RLJump({a})", "max3": "max3({a})",
     "max": "({a} + {b} + abs({a} - {b})) / 2",
     "min": "({a} + {b} - abs({a} - {b})) / 2",
-    "delay1": "ts_Shift({a}, 1)", "delay4": "ts_Shift({a}, 4)",
+    "delay1": "ts_ShiftZero({a}, 1)", "delay4": "ts_ShiftZero({a}, 4)",
     "power": "power({a}, 2)", "signed_log": "signed_log({a})", "sqrt": "sqrt({a})",
-    "clip": "clip({a}, -3, 3)", "sigmoid": "sigmoid({a})", "tanh_squash": "tanh_squash({a})",
-    "if_gt": "if_gt({a}, {b}, {c})", "winsorize": "winsorize({a}, -3, 3)",
-    "ts_Mean_5": "ts_Mean({a}, 5)", "ts_Mean_10": "ts_Mean({a}, 10)", "ts_Mean_20": "ts_Mean({a}, 20)",
-    "ts_Stdev_5": "ts_Stdev({a}, 5)", "ts_Stdev_10": "ts_Stdev({a}, 10)", "ts_Stdev_20": "ts_Stdev({a}, 20)",
-    "ts_Rank_5": "ts_Rank({a}, 5)", "ts_Rank_10": "ts_Rank({a}, 10)", "ts_Rank_20": "ts_Rank({a}, 20)",
-    "ts_Sum_5": "ts_Sum({a}, 5)", "ts_Sum_10": "ts_Sum({a}, 10)", "ts_Sum_20": "ts_Sum({a}, 20)",
-    "ts_Max_10": "ts_Max({a}, 10)", "ts_Max_20": "ts_Max({a}, 20)",
-    "ts_Min_10": "ts_Min({a}, 10)", "ts_Min_20": "ts_Min({a}, 20)",
-    "ts_Delta_5": "ts_Delta({a}, 5)",
-    "ts_Decay_5": "ts_Decay({a}, 5)", "ts_DecayExp_5": "ts_DecayExp({a}, 5)",
-    "ts_ArgMax_5": "ts_ArgMax({a}, 5)", "ts_ArgMin_5": "ts_ArgMin({a}, 5)",
-    "ts_ArgMax_10": "ts_ArgMax({a}, 10)", "ts_ArgMin_10": "ts_ArgMin({a}, 10)",
-    "ts_Product_5": "ts_Product({a}, 5)",
-    "ts_Scale": "ts_Scale({a})", "ts_Log": "ts_Log({a})",
-    "ts_Zscore_10": "(({a}) - ts_Mean({a}, 10)) / (ts_Stdev({a}, 10) + 1e-6)",
-    "ts_Zscore_20": "(({a}) - ts_Mean({a}, 20)) / (ts_Stdev({a}, 20) + 1e-6)",
-    "ts_Quantile_10": "ts_Quantile({a}, 10)",
-    "ts_Skew_10": "ts_Skewness({a}, 10)",
-    "momentum_5": "ts_Mean({a}, 5) - ts_Mean({a}, 20)",
-    "momentum_10": "ts_Mean({a}, 10) - ts_Mean({a}, 20)",
-    "ts_EMA_5": "ts_EMA({a}, 5)", "ts_EMA_20": "ts_EMA({a}, 20)",
-    "wma": "ts_WMA({a}, 3)",
-    "delta": "ts_Delta({a}, 1)",
-    "ts_DecayLinear_5": "ts_DecayLinear({a}, 5)",
-    "ts_Cov_10": "ts_Cov({a}, {b}, 10)",
-    "ts_Corr_10": "ts_Corr({a}, {b}, 10)",
-    "cs_Rank": "cs_Rank({a})", "cs_Demean": "cs_Demean({a})",
-    "cs_Zscore": "cs_Zscore({a})", "cs_TransNorm": "cs_TransNorm({a})",
+    "clip": "clip({a}, -3, 3)", "sigmoid": "sigmoid_squash({a})", "tanh_squash": "tanh_squash({a})",
+    "if_gt": "if_gt({a}, {b}, {c})", "winsorize": "ts_Winsorize({a}, 20)",
+    "ts_Mean_5": "ts_RLMean({a}, 5)", "ts_Mean_10": "ts_RLMean({a}, 10)", "ts_Mean_20": "ts_RLMean({a}, 20)",
+    "ts_Stdev_5": "ts_RLStdev({a}, 5)", "ts_Stdev_10": "ts_RLStdev({a}, 10)", "ts_Stdev_20": "ts_RLStdev({a}, 20)",
+    "ts_Rank_5": "ts_RLRank({a}, 5)", "ts_Rank_10": "ts_RLRank({a}, 10)", "ts_Rank_20": "ts_RLRank({a}, 20)",
+    "ts_Sum_5": "ts_RLSum({a}, 5)", "ts_Sum_10": "ts_RLSum({a}, 10)", "ts_Sum_20": "ts_RLSum({a}, 20)",
+    "ts_Max_10": "ts_RLMax({a}, 10)", "ts_Max_20": "ts_RLMax({a}, 20)",
+    "ts_Min_10": "ts_RLMin({a}, 10)", "ts_Min_20": "ts_RLMin({a}, 20)",
+    "ts_Delta_5": "ts_RLDelta({a}, 5)",
+    "ts_Decay_5": "(({a}) + 0.8 * ts_ShiftZero({a}, 1) + 0.6 * ts_ShiftZero({a}, 2)) / 2.4",
+    "ts_DecayExp_5": "ts_RLDecayExp({a}, 5, 0.5)",
+    "ts_ArgMax_5": "ts_RLArgMax({a}, 5)", "ts_ArgMin_5": "ts_RLArgMin({a}, 5)",
+    "ts_ArgMax_10": "ts_RLArgMax({a}, 10)", "ts_ArgMin_10": "ts_RLArgMin({a}, 10)",
+    "ts_Product_5": "ts_RLProduct({a}, 5)",
+    "ts_Scale": "ts_RLScale({a})", "ts_Log": "ts_RLLog({a})",
+    "ts_Zscore_10": "ts_RLZscore({a}, 10)",
+    "ts_Zscore_20": "ts_RLZscore({a}, 20)",
+    "ts_Quantile_10": "ts_RLQuantile({a}, 10)",
+    "ts_Skew_10": "ts_RLSkew({a}, 10)",
+    "momentum_5": "ts_RLMean({a}, 5) - ts_RLMean({a}, 20)",
+    "momentum_10": "ts_RLMean({a}, 10) - ts_RLMean({a}, 20)",
+    "ts_EMA_5": "ts_RLEMA({a}, 5)", "ts_EMA_20": "ts_RLEMA({a}, 20)",
+    "wma": "ts_RLWMA({a})",
+    "delta": "ts_RLDelta({a}, 1)",
+    "ts_DecayLinear_5": "ts_RLDecayLinear({a}, 5)",
+    "ts_Cov_10": "ts_RLCov({a}, {b}, 10)",
+    "ts_Corr_10": "ts_RLCorr({a}, {b}, 10)",
+    "cs_Rank": "cs_RankRL({a})", "cs_Demean": "cs_Demean({a})",
+    "cs_Scale": "cs_MinMaxScale({a})", "cs_Zscore": "cs_ZscoreRL({a})", "cs_TransNorm": "cs_TransNormRL({a})",
 }

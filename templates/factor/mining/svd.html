@@ -1,0 +1,156 @@
+  <div x-show="activeTab === 'mining' && miningSubTab === 'svd'" class="space-y-4">
+    <div class="bg-white rounded-lg p-4 shadow-sm">
+      <div class="grid grid-cols-6 gap-3 mb-4">
+        <div>
+          <label class="text-xs text-gray-500">开始日期</label>
+          <input type="date" x-model="startDate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">结束日期</label>
+          <input type="date" x-model="endDate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">隐因子数</label>
+          <input type="number" x-model.number="svdNFactors" min="1" max="20" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">股票池</label>
+          <select x-model="poolType" @change="onPoolTypeChange()" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="active">成交活跃股(自动)</option>
+            <option value="industry">申万行业</option>
+            <option value="sector">板块</option>
+            <option value="concept">概念</option>
+            <option value="index">常见指数</option>
+            <option value="custom">自定义</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500" x-text="poolLabel()"></label>
+          <template x-if="poolType !== 'active' && poolType !== 'custom'">
+            <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+              <option value="">请选择</option>
+              <template x-for="opt in poolOptions" :key="opt.value">
+                <option :value="opt.value" x-text="opt.label"></option>
+              </template>
+            </select>
+          </template>
+          <template x-if="poolType === 'custom'">
+            <input type="text" x-model="poolRef" placeholder="逗号分隔代码, 如 600519.SH"
+                   class="w-full px-2 py-1 text-sm border rounded">
+          </template>
+          <template x-if="poolType === 'active'">
+            <input type="text" disabled value="自动选取成交活跃股"
+                   class="w-full px-2 py-1 text-sm border rounded bg-gray-50 text-gray-500">
+          </template>
+        </div>
+        <div class="flex items-end">
+          <button @click="runSvd()" :disabled="mining"
+                  class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  x-text="mining ? '运行中...' : '运行SVD'"></button>
+        </div>
+      </div>
+      <div class="text-xs text-gray-400 mb-2">使用股票池: <span x-text="poolLabel()"></span></div>
+
+      <div x-show="svdResult" class="space-y-3">
+        <!-- 统计卡 -->
+        <div class="grid grid-cols-4 gap-2 text-center text-sm">
+          <div class="bg-blue-50 rounded p-2">
+            <div class="text-xs text-gray-500">股票数</div>
+            <div class="font-bold" x-text="svdResult?.n_stocks"></div>
+          </div>
+          <div class="bg-blue-50 rounded p-2">
+            <div class="text-xs text-gray-500">交易日数</div>
+            <div class="font-bold" x-text="svdResult?.n_dates"></div>
+          </div>
+          <div class="bg-green-50 rounded p-2">
+            <div class="text-xs text-gray-500">隐因子数</div>
+            <div class="font-bold" x-text="Object.keys(svdResult?.factors || {}).length"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">可分解因子</div>
+            <div class="font-bold" x-text="svdResult?.total_factors_available"></div>
+          </div>
+        </div>
+
+        <!-- 奇异值/方差解释 -->
+        <div id="svd-variance-chart" style="height: 300px;"></div>
+
+        <!-- 隐因子表格 + 暴露热力图 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr><th class="px-3 py-1 text-left">因子</th><th class="px-3 py-1 text-right">奇异值</th><th class="px-3 py-1 text-right">方差解释</th><th class="px-3 py-1 text-right">累计</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="(f, name) in (svdResult?.factors || {})" :key="name">
+                  <tr class="border-b">
+                    <td class="px-3 py-1 font-mono" x-text="name"></td>
+                    <td class="px-3 py-1 text-right" x-text="fmtNum(f.singular_value)"></td>
+                    <td class="px-3 py-1 text-right" x-text="fmtPct(f.variance_explained)"></td>
+                    <td class="px-3 py-1 text-right" x-text="fmtPct(f.cumulative_variance)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">隐因子对股票暴露 (热力图, 显著暴露Top20)</div>
+            <div id="svd-exposure-chart" style="height: 300px;"></div>
+          </div>
+        </div>
+
+        <!-- 隐因子时序 (U*S: 各隐因子状态随时间变化) -->
+        <div>
+          <div class="text-xs text-gray-500 mb-1">隐因子时序</div>
+          <div id="svd-ts-chart" style="height: 280px;"></div>
+        </div>
+
+        <!-- 残差分析 + 滚动SVD -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div class="bg-gray-50 rounded p-3">
+            <div class="text-xs text-gray-500 mb-1">残差分析 (前N因子重构收益率解释力)</div>
+            <div class="grid grid-cols-3 gap-2 text-center text-sm">
+              <div>
+                <div class="text-xs text-gray-500">解释方差占比</div>
+                <div class="font-bold text-green-600" x-text="fmtPct(svdResult?.residual?.explained_var_ratio)"></div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">残差方差占比</div>
+                <div class="font-bold text-red-500" x-text="fmtPct(svdResult?.residual?.residual_var_ratio)"></div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">残差标准差</div>
+                <div class="font-bold" x-text="fmtNum(svdResult?.residual?.residual_std)"></div>
+              </div>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <div class="text-xs text-gray-500 mb-1">滚动SVD (区间分3段, 前N因子方差占比稳定性)</div>
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-2 py-1 text-left">区间</th>
+                  <template x-for="(f, name) in (svdResult?.factors || {})" :key="name">
+                    <th class="px-2 py-1 text-right" x-text="'F' + name.replace('svd_factor_', '')"></th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(rg, ri) in (svdResult?.rolling || [])" :key="ri">
+                  <tr class="border-b">
+                    <td class="px-2 py-1 text-xs" x-text="rg.start + ' ~ ' + rg.end"></td>
+                    <template x-for="(v, vi) in (rg.top_var || [])" :key="vi">
+                      <td class="px-2 py-1 text-right text-xs" x-text="fmtPct(v)"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+

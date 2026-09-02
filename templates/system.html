@@ -6,14 +6,9 @@
 
     <button class="help-btn-floating" @click="showHelp = true" title="使用说明">?</button>
 
-    <!-- 使用说明 modal -->
-    <div class="modal-overlay" x-show="showHelp" x-cloak @click.self="showHelp = false">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div class="modal-title">系统状态 -- 使用说明</div>
-                <button class="modal-close" @click="showHelp = false">×</button>
-            </div>
-            <div class="modal-body">
+    <!-- 使用说明 modal (统一外壳组件) -->
+    {% set help_title = '系统状态' %}
+    {% set help_content_html %}
                 <h4>这个 Tab 是干嘛的</h4>
                 <p>系统级运维面板, 一眼看出"哪个组件挂了"。还有标准 cron 时点参考。</p>
 
@@ -47,9 +42,8 @@
                     <b>场景 1 (排错)</b>: 投研对话不出回复 → 查"DASHSCOPE_API_KEY" 是不是 OK<br/><br/>
                     <b>场景 2 (上线前自检)</b>: 启动 cron 调度前先点"健康检查", 全 OK 再跑
                 </div>
-            </div>
-        </div>
-    </div>
+    {% endset %}
+    {% include "_components/help_modal.html" %}
 
     <div class="grid-2">
         <!-- 健康检查 -->
@@ -85,8 +79,8 @@
             </template>
         </div>
 
-        <!-- 定时任务 cron -->
-        <div class="card" x-data="schedulerApp()" x-init="init()">
+        <!-- 定时任务 cron (根组件 systemApp 已合并调度器状态, 无需再嵌套 x-data) -->
+        <div class="card">
             <div class="card-header">
                 <div class="card-title">定时任务</div>
                 <div class="card-subtitle flex items-center gap-2">
@@ -157,79 +151,6 @@
 
 </div>
 
-<script>
-function systemApp() {
-    return {
-        showHelp: false,
-        health: null,
-        checking: false,
-        // 注意：init 不再自动调 check()，避免 health 接口里的 xtdata 连接阻塞页面首次渲染
-        async init() {},
-        async check() {
-            this.checking = true;
-            try {
-                this.health = await App.get('/api/system/health');
-            } catch (e) {
-                console.error('健康检查失败:', e);
-                this.health = [{item: '健康检查', value: '请求失败: ' + e.message, status: 'ERROR'}];
-            }
-            this.checking = false;
-        },
-    }
-}
-
-function schedulerApp() {
-    return {
-        jobs: [],
-        heartbeat: { online: false },
-        saving: false,
-        controlling: false,
-        async init() {
-            await this.load();
-            // 每 10 秒刷新一次在线状态
-            setInterval(() => this.load(), 10000);
-        },
-        async load() {
-            try {
-                const data = await App.get('/api/system/scheduler/config');
-                this.jobs = data.jobs || [];
-                this.heartbeat = data.heartbeat || { online: false };
-            } catch (e) {
-                console.error('加载调度器配置失败:', e);
-            }
-        },
-        async toggle(job) {
-            this.saving = true;
-            const enabled = !job.enabled;
-            try {
-                const payload = {};
-                payload[job.enabled_by] = enabled;
-                await App.post('/api/system/scheduler/config', payload);
-                job.enabled = enabled;
-            } catch (e) {
-                console.error('保存调度器配置失败:', e);
-                alert('保存失败: ' + e.message);
-            } finally {
-                this.saving = false;
-            }
-        },
-        async control(action) {
-            this.controlling = true;
-            try {
-                const data = await App.post('/api/system/scheduler/control?action=' + action, {});
-                if (data.ok) {
-                    await this.load();
-                } else {
-                    alert('操作失败: ' + (data.error || '未知错误'));
-                }
-            } catch (e) {
-                console.error('scheduler 控制失败:', e);
-                alert('操作失败: ' + e.message);
-            } finally {
-                this.controlling = false;
-            }
-        },
-    }
-}
-</script>
+<!-- system 页面逻辑外置: 与模板解耦 (结构统一) -->
+<script src="/static/js/system/app.js?v={{ app_ver }}"></script>
 {% endblock %}

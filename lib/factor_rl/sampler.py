@@ -80,9 +80,10 @@ class ConstrainedSampler:
         return mask
 
     def update_infection(self, token, infected_chain_len):
-        """更新感染链长度: 恒正算子 +1, 恢复算子归 0, 传播算子 (已感染时) +1"""
+        """更新感染链长度 (与原版 AlphaMaster 一致):
+        特征 token 不改变感染状态; 恒正算子 +1; 恢复算子归 0; 传播算子已感染时 +1"""
         if token < self.feat_offset:
-            return 0  # 特征 token 重置
+            return infected_chain_len
         if token in self.positive_only_ids:
             return infected_chain_len + 1
         if token in self.infected_propagating_ids:

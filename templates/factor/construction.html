@@ -1,0 +1,448 @@
+  <!-- ==================== Tab 2: 因子构建 (块式可视化组装) ==================== -->
+  <div x-show="activeTab === 'builder'" class="space-y-4">
+    <div class="grid grid-cols-12 gap-4">
+      <!-- 左侧: 点击式组件面板 (两列, 拉宽1/4) -->
+      <div class="col-span-5 space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <!-- 左半列: 运算符/原始字段/算子 -->
+          <div class="space-y-3">
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">运算符</h3>
+              <div class="grid grid-cols-4 gap-1">
+                <button @click="bldInsertOp('+')" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">+</button>
+                <button @click="bldInsertOp('-')" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">-</button>
+                <button @click="bldInsertOp('*')" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">*</button>
+                <button @click="bldInsertOp('/')" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">/</button>
+                <button @click="bldInsertOp('-1*')" title="反向因子: 对整个表达式取负, 用于构造反向策略"
+                        class="px-2 py-1 text-xs border rounded hover:bg-gray-50">-1*</button>
+                <button @click="bldInsertOp('(')" title="括号: 在槽位中新建一段复合运算"
+                        class="px-2 py-1 text-xs border rounded hover:bg-gray-50">括号( )</button>
+                <button @click="bldInsertNum()" title="数字块: 生成一个只能输入数字的块, 拖到算子的周期/参数槽"
+                        class="px-2 py-1 text-xs border rounded hover:bg-gray-50">数字</button>
+                <button @click="bldShowHelp = !bldShowHelp" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">帮助</button>
+              </div>
+              <p class="text-[11px] text-gray-400 mt-2">点击 + - * / 会给整个表达式外层加运算(右侧留空槽); -1* 为反向因子(整体取反); 括号用于在空槽中新建复合运算</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">原始字段</h3>
+              <div class="flex flex-wrap gap-1">
+                <template x-for="field in fields" :key="field.name">
+                  <button @click="bldInsertField(field.name)"
+                          class="px-2 py-1 text-xs font-mono border rounded hover:bg-green-50 text-green-600"
+                          :title="field.desc">
+                    <span x-text="field.name"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">时序算子 <span class="text-[11px] font-normal text-gray-400">(点击成块并拖入参数)</span></h3>
+              <div class="space-y-1 max-h-56 overflow-y-auto">
+                <template x-for="op in operators.filter(o => o.category === '时序')" :key="op.name">
+                  <button @click="bldInsertOpBlock(op)"
+                          class="block w-full text-left px-2 py-1 text-xs hover:bg-blue-50 rounded font-mono"
+                          :title="op.desc">
+                    <span class="text-blue-600" x-text="op.name"></span>
+                    <span class="text-gray-400 ml-1" x-text="op.desc"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">截面算子 <span class="text-[11px] font-normal text-gray-400">(点击成块并拖入参数)</span></h3>
+              <div class="space-y-1 max-h-56 overflow-y-auto">
+                <template x-for="op in operators.filter(o => o.category === '截面')" :key="op.name">
+                  <button @click="bldInsertOpBlock(op)"
+                          class="block w-full text-left px-2 py-1 text-xs hover:bg-purple-50 rounded font-mono"
+                          :title="op.desc">
+                    <span class="text-purple-600" x-text="op.name"></span>
+                    <span class="text-gray-400 ml-1" x-text="op.desc"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">算术算子 <span class="text-[11px] font-normal text-gray-400">(点击成块并拖入参数)</span></h3>
+              <div class="space-y-1 max-h-56 overflow-y-auto">
+                <template x-for="op in operators.filter(o => o.category === '算术')" :key="op.name">
+                  <button @click="bldInsertOpBlock(op)"
+                          class="block w-full text-left px-2 py-1 text-xs hover:bg-amber-50 rounded font-mono"
+                          :title="op.desc">
+                    <span class="text-amber-600" x-text="op.name"></span>
+                    <span class="text-gray-400 ml-1" x-text="op.desc"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右半列: 全部因子/参数化基类/基础因子 -->
+          <div class="space-y-3">
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">全部因子 <span class="text-[11px] font-normal text-gray-400">(点击载入块式)</span></h3>
+              <div class="flex gap-1 mb-2">
+                <select x-model="allFactorCat" class="flex-none w-20 px-1 py-1 text-[11px] border rounded">
+                  <option value="">全部类型</option>
+                  <option value="basic">基础因子</option>
+                  <option value="composite">复合因子</option>
+                  <option value="financial">财务</option>
+                </select>
+                <input type="text" x-model="allFactorSearch" placeholder="搜索因子..."
+                       class="flex-1 px-2 py-1 text-[11px] border rounded">
+              </div>
+              <div class="space-y-1 max-h-40 overflow-y-auto" x-show="allFactorFiltered.length">
+                <template x-for="f in allFactorFiltered" :key="f.factor_id">
+                  <button @click="bldInsertFactor(f)"
+                          class="block w-full text-left px-2 py-1 text-xs hover:bg-teal-50 rounded font-mono truncate"
+                          :title="f.formula">
+                    <span class="text-teal-600" x-text="f.factor_id"></span>
+                    <span class="text-gray-400 ml-1" x-text="f.name"></span>
+                  </button>
+                </template>
+              </div>
+              <p x-show="!allFactorFiltered.length" class="text-[11px] text-gray-400">暂无匹配因子</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">参数化基类 <span class="text-[11px] font-normal text-gray-400">(点击成块并拖入周期)</span></h3>
+              <div class="space-y-1 max-h-40 overflow-y-auto" x-show="periodicBases.length">
+                <template x-for="b in periodicBases" :key="b.base_id">
+                  <button @click="bldInsertBaseBlock(b)"
+                          class="block w-full text-left px-2 py-1 text-xs hover:bg-indigo-50 rounded font-mono"
+                          :title="b.description || b.formula_template">
+                    <span class="text-indigo-600" x-text="b.base_id"></span>
+                    <span class="text-gray-400 ml-1" x-text="b.name"></span>
+                  </button>
+                </template>
+              </div>
+              <p x-show="!periodicBases.length" class="text-[11px] text-gray-400">暂无参数化基类</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-3 shadow-sm">
+              <h3 class="text-sm font-semibold mb-2 text-gray-700">基础因子 <span class="text-[11px] font-normal text-gray-400">(点击插入公式)</span></h3>
+              <div class="flex gap-1 mb-2">
+                <select x-model="fixedBaseCat"
+                        class="flex-none w-20 px-1 py-1 text-[11px] border rounded">
+                  <option value="">全部分类</option>
+                  <template x-for="cat in baseCategories" :key="cat">
+                    <option :value="cat" x-text="cat"></option>
+                  </template>
+                </select>
+                <input type="text" x-model="fixedBaseSearch" placeholder="搜索名称/ID..."
+                       class="flex-1 px-2 py-1 text-[11px] border rounded focus:outline-none focus:ring-1 focus:ring-orange-400">
+              </div>
+              <div class="space-y-1 max-h-56 overflow-y-auto" x-show="fixedBasesFiltered.length">
+                <template x-for="b in fixedBasesFiltered" :key="b.base_id">
+                  <button @click="bldInsertFixedBase(b)" :disabled="!b.assemblable"
+                          class="block w-full text-left px-2 py-1 text-xs rounded font-mono"
+                          :class="b.assemblable ? 'hover:bg-orange-50 cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+                          :title="(b.name || '') + (b.formula ? ' | ' + b.formula : '') + (b.skip_reason ? ' | ' + b.skip_reason : '')">
+                    <span class="text-orange-600" x-text="b.base_id"></span>
+                    <span class="text-gray-400 ml-1" x-text="b.name"></span>
+                    <span x-show="b.formula" class="block text-[10px] text-gray-400 truncate" x-text="b.formula"></span>
+                    <span x-show="!b.assemblable && b.skip_reason" class="block text-[10px] text-red-400 truncate" x-text="b.skip_reason"></span>
+                  </button>
+                </template>
+              </div>
+              <p x-show="!fixedBasesFiltered.length" class="text-[11px] text-gray-400">暂无匹配的基础因子</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中间: 表达式 + 评价 (col-span-7, 占原中+右列宽度) -->
+      <div class="col-span-7 space-y-3">
+        <!-- 示例公式 (竖排3个, 直接展示公式) -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">示例公式 <span class="text-[11px] font-normal text-gray-400">(点击填入表达式)</span></h3>
+          <div class="space-y-1">
+            <template x-for="(ex, i) in examples.slice(0, 3)" :key="i">
+              <button @click="useExample(ex.expr)"
+                      class="block w-full text-left px-2 py-1 text-[11px] border rounded hover:bg-blue-50">
+                <span class="font-semibold text-gray-700" x-text="ex.name"></span>
+                <span class="text-gray-400 ml-1 font-mono break-all" x-text="ex.expr"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">因子表达式 <span class="text-[11px] font-normal text-gray-400">(点击块选中/拖入槽位, 周期槽键盘输入, 拖入垃圾桶删除)</span></h3>
+            <div class="flex gap-2">
+              <button @click="bldDeleteSelected()" class="px-2 py-1 text-xs border rounded hover:bg-red-50 hover:text-red-600">删除选中块</button>
+              <button @click="clearExpression()" class="px-2 py-1 text-xs border rounded hover:bg-gray-50">清空</button>
+              <button @click="runTrial()" :disabled="trialRunning"
+                      class="px-3 py-1 text-sm bg-amber-500 text-white rounded hover:bg-amber-600"
+                      x-text="trialRunning ? '校验中...' : '校验/试算'"></button>
+              <button @click="runBuilderEval()" :disabled="bldEvalRunning"
+                      class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                      x-text="bldEvalRunning ? '评价中...' : '运行评价'"></button>
+              <button @click="openSaveModal()" class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">加入因子库</button>
+            </div>
+          </div>
+          <!-- 操作说明 (默认隐藏) -->
+          <div x-show="bldShowHelp" x-cloak class="mt-1 mb-1 text-[11px] text-gray-500 bg-blue-50 rounded p-2 space-y-1">
+            <div>点击左侧「字段/算子/基类/全部因子/数字」→ 块先进入下方的<b>暂存区</b>，再把块<b>拖进</b>表达式槽位组合。</div>
+            <div>点击 <b>+ - * /</b>：若已选中一个块，则把该块<b>包裹</b>成 (选中块 运算符 空槽)；未选中则放暂存区。</div>
+            <div>点击 <b>括号( )</b>：在表达式空槽里新建一段空括号，用于放复杂运算；未选中则放暂存区。</div>
+            <div><b>数字</b>：生成一个只能输入数字的块，拖到算子的<b>数字槽</b>(蓝色) 或加减两侧的字段槽。</div>
+            <div><b>槽位类型</b>：数字槽(蓝)只能放数字块；算子第一个参数(仅字段)不能放数字块；加减两侧可放字段块也可放数字块。</div>
+            <div><b>-1*</b>：反向因子（对整个表达式取负），用于构造反向策略。</div>
+            <div><b>拖入已有块的槽位</b>＝交换两个块（源块进目标槽，原块回源位置），不会覆盖丢弃；类型不兼容才拒绝。</div>
+            <div><b>暂存区</b>＝空白区域：可把表达式里的块拖回暂存区，腾出位置后调整顺序/层级，再拖回去。</div>
+            <div><b>垃圾桶</b>：拖入即删除该块。</div>
+          </div>
+          <!-- 块式编辑区: 点击左侧组件拼块, 拖拽块到槽位组合, 删除选中块或拖到垃圾桶 -->
+          <div id="block-editor" class="bld-editor min-h-[110px] p-2 border rounded bg-gray-50 text-[12px] leading-6"
+               x-html="blockHtml"
+               @click="bldOnContainerClick($event)"
+               @dragstart="bldOnDragStart($event)"
+               @dragover.prevent="bldOnDragOver($event)"
+               @drop.prevent="bldOnRootDrop($event)"
+               @dragend="bldOnDragEnd($event)"
+               @input="bldOnNumInput($event)"
+               @focusout="bldOnNumBlur($event)"></div>
+          <!-- 暂存区 (空白区域): 已点击组件先到此处; 可拖入表达式槽位组合, 表达式里的块也可拖回这里暂存/调整顺序 -->
+          <div class="bld-editor mt-2 rounded border-2 border-dashed border-teal-300 bg-teal-50/40 p-2"
+               @dragstart="bldOnDragStart($event)"
+               @dragover.prevent @drop.prevent="bldOnWorkDrop($event)"
+               @dragend="bldOnDragEnd($event)"
+               @click="bldOnWorkClick($event)"
+               @input="bldOnNumInput($event)"
+               @focusout="bldOnNumBlur($event)">
+            <div class="flex items-center gap-2 mb-1 text-[11px] text-teal-600">
+              <span class="font-semibold">暂存区</span>
+              <span class="text-[10px] text-teal-500">点击左侧组件放入此区 → 拖入表达式槽位；表达式里的块也可拖回这里调整顺序；点击暂存区块=放入首个空槽</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-1 min-h-[34px]" x-html="workHtml"></div>
+          </div>
+          <!-- 垃圾桶: 拖块到此处删除 -->
+          <div class="mt-2 flex items-center justify-center gap-1 rounded border border-dashed border-red-300 text-red-400 text-[11px] py-1 hover:bg-red-50 transition-colors"
+               @dragover.prevent @drop.prevent="bldOnTrashDrop($event)">
+            <span>垃圾桶</span>
+            <span class="text-[10px]">(把不需要的块拖到这里删除)</span>
+          </div>
+          <!-- 只读表达式: 由块结构自动生成 -->
+          <div class="mt-2 text-[11px] text-gray-500">
+            <span>表达式: </span>
+            <span class="font-mono break-all text-gray-600" x-text="expression || '（空）'"></span>
+          </div>
+          <!-- 自动解析标签 (入库前预览) -->
+          <div x-show="expression" class="mt-2 flex flex-wrap items-center gap-2 text-xs bg-gray-50 rounded p-2">
+            <span class="text-gray-500">自动解析:</span>
+            <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded">基类: <span x-text="bldTags?.base_id || '—'"></span></span>
+            <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded">类型: <span x-text="bldTags?.factor_type || '—'"></span></span>
+            <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">方向: <span x-text="bldTags?.direction || '—'"></span></span>
+          </div>
+        </div>
+
+        <!-- 校验/试算结果 -->
+        <div x-show="trialResult" class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">校验/试算结果</h3>
+          <template x-if="trialResult">
+            <div class="space-y-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-white font-semibold"
+                      :class="trialResult.ok ? 'bg-green-600' : 'bg-red-600'"
+                      x-text="trialResult.ok ? '通过' : '未通过'"></span>
+                <span class="text-gray-600" x-text="trialResult.message"></span>
+              </div>
+              <!-- 自动解析标签 -->
+              <div class="flex flex-wrap items-center gap-2 bg-gray-50 rounded p-2" x-show="trialResult.tags">
+                <span class="text-gray-500">解析:</span>
+                <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded">基类: <span x-text="trialResult.tags?.base_id || '—'"></span></span>
+                <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded">类型: <span x-text="trialResult.factor_type || '—'"></span></span>
+                <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">方向: <span x-text="trialResult.tags?.direction || '—'"></span></span>
+              </div>
+              <!-- 数据统计 -->
+              <div x-show="trialResult.data_stats" class="grid grid-cols-5 gap-2 text-center">
+                <div class="bg-gray-50 rounded p-2"><div class="text-gray-500">非空率</div><div class="font-bold" x-text="fmtPct(1 - (trialResult.data_stats?.nan_ratio || 0))"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-gray-500">均值</div><div class="font-bold font-mono" x-text="fmtNum(trialResult.data_stats?.mean)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-gray-500">标准差</div><div class="font-bold font-mono" x-text="fmtNum(trialResult.data_stats?.std)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-gray-500">样本数</div><div class="font-bold" x-text="trialResult.data_stats?.count"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-gray-500">股票/日期</div><div class="font-bold" x-text="(trialResult.data_stats?.n_stocks || 0) + '只/' + (trialResult.data_stats?.n_dates || 0) + '日'"></div></div>
+              </div>
+              <!-- 警告 -->
+              <div x-show="trialResult.warnings && trialResult.warnings.length" class="space-y-1">
+                <template x-for="(w, i) in trialResult.warnings" :key="i">
+                  <div class="flex items-start gap-1 text-amber-700 bg-amber-50 rounded px-2 py-1">
+                    <span>警告</span>
+                    <span x-text="w"></span>
+                  </div>
+                </template>
+              </div>
+              <!-- 建议 -->
+              <div x-show="trialResult.suggestions && trialResult.suggestions.length" class="space-y-1">
+                <template x-for="(s, i) in trialResult.suggestions" :key="i">
+                  <div class="flex items-start gap-1 text-blue-700 bg-blue-50 rounded px-2 py-1">
+                    <span>建议</span>
+                    <span x-text="s"></span>
+                  </div>
+                </template>
+              </div>
+              <!-- 评价方式提示 (technical_ts 建议, 表达式无法自动区分) -->
+              <div x-show="trialResult.eval_hint"
+                   class="flex items-start gap-1 text-cyan-700 bg-cyan-50 rounded px-2 py-1">
+                <span>提示</span>
+                <span x-text="trialResult.eval_hint"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 评价参数 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">评价参数</h3>
+          <div class="grid grid-cols-4 gap-2">
+            <div>
+              <label class="text-xs text-gray-500">开始日期</label>
+              <input type="date" x-model="startDate" class="w-full px-2 py-1 text-sm border rounded">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">结束日期</label>
+              <input type="date" x-model="endDate" class="w-full px-2 py-1 text-sm border rounded">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">分层数</label>
+              <select x-model="nLayers" class="w-full px-2 py-1 text-sm border rounded">
+                <option :value="3">3</option>
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">调仓周期(日)</label>
+              <input type="number" x-model="rebalPeriod" min="1" class="w-full px-2 py-1 text-sm border rounded">
+            </div>
+          </div>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-500">股票池</label>
+              <select x-model="poolType" @change="onPoolTypeChange()" class="w-full px-2 py-1 text-sm border rounded">
+                <option value="active">成交活跃股(自动80只)</option>
+                <option value="industry">申万行业</option>
+                <option value="sector">板块</option>
+                <option value="concept">概念</option>
+                <option value="index">常见指数</option>
+                <option value="custom">自定义</option>
+                <option value="single">单股</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500" x-text="poolLabel()"></label>
+              <template x-if="poolType === 'industry' || poolType === 'sector' || poolType === 'concept' || poolType === 'index'">
+                <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+                  <option value="">请选择</option>
+                  <template x-for="opt in poolOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </template>
+              <template x-if="poolType === 'custom'">
+                <input type="text" x-model="poolRef" placeholder="逗号分隔代码" class="w-full px-2 py-1 text-sm border rounded">
+              </template>
+              <template x-if="poolType === 'single'">
+                <input type="text" x-model="poolRef" placeholder="如 600519.SH" class="w-full px-2 py-1 text-sm border rounded">
+              </template>
+              <template x-if="poolType === 'active'">
+                <input type="text" x-model="stockPoolInput" @keydown.enter="addStock()"
+                       placeholder="追加代码回车" class="w-full px-2 py-1 text-sm border rounded">
+              </template>
+            </div>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-1" x-show="poolType === 'active'">
+            <template x-for="code in stockCodes" :key="code">
+              <span class="px-2 py-0.5 text-xs bg-gray-100 rounded flex items-center gap-1">
+                <span x-text="code"></span>
+                <button @click="stockCodes = stockCodes.filter(c => c !== code)" class="text-red-500">×</button>
+              </span>
+            </template>
+            <button @click="loadDefaultPool()" class="text-xs text-blue-600 hover:underline">载入默认池</button>
+          </div>
+        </div>
+
+        <!-- 评价结果 -->
+        <div x-show="bldEvalResult" class="bg-white rounded-lg p-3 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">评价结果</h3>
+            <!-- 评价方式/管线类型徽章: 构建页性能测试直接告知"该因子是什么类型/该填什么评价方式" -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+              <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-600"
+                    x-text="'评价方式: ' + (bldEvalResult?.single_pipeline_type || bldEvalResult?.factor_type || '—')"></span>
+              <span class="px-2 py-0.5 rounded bg-cyan-50 text-cyan-600"
+                    x-show="bldEvalResult?.factor_type === 'technical_ts' || bldEvalResult?.single_pipeline_type === 'technical_ts'"
+                    x-text="'时序分位化窗口 ' + (bldEvalResult?.ts_normalize_window || 250) + '日'"></span>
+              <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-600"
+                    x-show="bldEvalResult?.factor_type === 'financial' && bldEvalResult?.financial_quality"
+                    x-text="'中位数填充占比 ' + fmtPct(bldEvalResult?.financial_quality?.fill_ratio) + ' | 财报调仓点 ' + (bldEvalResult?.financial_quality?.n_report_dates || 0)"></span>
+              <span class="px-2 py-0.5 rounded bg-purple-50 text-purple-600"
+                    x-show="bldEvalResult?.factor_type === 'single' && bldEvalResult?.single_pipeline_type === 'signal'"
+                    x-text="'单股事件信号评价'"></span>
+            </div>
+          </div>
+          <template x-if="bldEvalResult">
+            <div class="space-y-3">
+              <!-- 通用指标卡 (技术/财务) -->
+              <div x-show="bldEvalResult.factor_type !== 'single' && !isSignalType(bldEvalResult.factor_type)"
+                   class="grid grid-cols-6 gap-2 text-center">
+                <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IC均值</div><div class="text-lg font-bold" :class="icColor(bldEvalResult.ic_timeseries?.ic_mean)" x-text="fmtNum(bldEvalResult.ic_timeseries?.ic_mean)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IR</div><div class="text-lg font-bold" :class="icColor(bldEvalResult.ic_timeseries?.ir)" x-text="fmtNum(bldEvalResult.ic_timeseries?.ir)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">RankIC</div><div class="text-lg font-bold" :class="icColor(bldEvalResult.ic_timeseries?.rank_ic_mean)" x-text="fmtNum(bldEvalResult.ic_timeseries?.rank_ic_mean)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">多空收益</div><div class="text-lg font-bold" x-text="fmtPct(bldEvalResult.layered_backtest?.long_short)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">PWC夏普</div><div class="text-lg font-bold" :class="icColor(bldEvalResult.performance_with_cost?.sharpe_ratio)" x-text="fmtNum(bldEvalResult.performance_with_cost?.sharpe_ratio)"></div></div>
+                <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有效性</div><div class="text-lg font-bold" x-text="bldEvalResult.effectiveness_grade?.ic_grade"></div></div>
+              </div>
+              <!-- 单股时序IC -->
+              <div x-show="bldEvalResult.factor_type === 'single'">
+                <div class="grid grid-cols-4 gap-2 text-center mb-2">
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IC均值</div><div class="text-lg font-bold" x-text="fmtNum(bldEvalResult.single_ic?.ic_mean)"></div></div>
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IR</div><div class="text-lg font-bold" x-text="fmtNum(bldEvalResult.single_ic?.ir)"></div></div>
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IC胜率</div><div class="text-lg font-bold" x-text="fmtPct(bldEvalResult.single_ic?.ic_positive_ratio)"></div></div>
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有效性</div><div class="text-lg font-bold" x-text="bldEvalResult.effectiveness_grade?.single_grade"></div></div>
+                </div>
+                <div id="bld-single-ic-chart" style="height: 240px;"></div>
+              </div>
+              <!-- K线形态信号评价 -->
+              <div x-show="isSignalType(bldEvalResult.factor_type)">
+                <div class="grid grid-cols-4 gap-2 text-center">
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有信号占比</div><div class="text-lg font-bold" x-text="fmtPct(bldEvalResult.pattern_evaluation?.signal_frequency?.signal_ratio)"></div></div>
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">看涨占比</div><div class="text-lg font-bold text-red-600" x-text="fmtPct(bldEvalResult.pattern_evaluation?.signal_frequency?.bull_ratio)"></div></div>
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">看跌占比</div><div class="text-lg font-bold text-green-600" x-text="fmtPct(bldEvalResult.pattern_evaluation?.signal_frequency?.bear_ratio)"></div></div>
+                  <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">整体命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(bldEvalResult.pattern_evaluation?.hit_rate?.overall_hit_rate)"></div></div>
+                </div>
+              </div>
+              <!-- 图表 (技术/财务) -->
+              <template x-if="bldEvalResult.factor_type !== 'single' && !isSignalType(bldEvalResult.factor_type)">
+                <div class="space-y-3">
+                  <div>
+                    <div class="text-xs text-gray-600 mb-1">IC 时序</div>
+                    <div id="bld-ic-chart" style="height: 240px;"></div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <div class="text-xs text-gray-600 mb-1">分层收益</div>
+                      <div id="bld-layer-chart" style="height: 240px;"></div>
+                    </div>
+                    <div>
+                      <div class="text-xs text-gray-600 mb-1">分位收益</div>
+                      <div id="bld-quantile-chart" style="height: 240px;"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-gray-600 mb-1">PWC 累计收益 (含交易成本)</div>
+                    <div id="bld-pwc-chart" style="height: 240px;"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+

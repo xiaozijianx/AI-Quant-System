@@ -8,7 +8,7 @@
 
 用法：
     python report_generator.py --analysis_file <分析结果JSON> --output_dir <输出目录>
-    python report_generator.py --analysis_file output/贵州茅台_analysis.json --output_dir output/reports/
+    python report_generator.py --analysis_file outputs/analysis/贵州茅台_analysis.json --output_dir outputs/reports/
 """
 
 import argparse
@@ -411,7 +411,7 @@ def save_html_report(report: str, stock_name: str, output_dir: str) -> str:
 def main():
     parser = argparse.ArgumentParser(description="研报生成器")
     parser.add_argument("--analysis_file", required=True, help="五步法分析结果 JSON 文件")
-    parser.add_argument("--output_dir", default="./output/reports", help="研报输出目录")
+    parser.add_argument("--output_dir", default="./outputs/reports", help="研报输出目录")
     parser.add_argument(
         "--format",
         choices=["md", "html", "both"],

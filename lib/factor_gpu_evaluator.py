@@ -506,7 +506,13 @@ def batch_spearmanr(x: torch.Tensor, y: torch.Tensor, mask: Optional[torch.Tenso
     vx = (cx * cx).sum(dim=1) / n
     vy = (cy * cy).sum(dim=1) / n
     corr = cov / torch.sqrt(vx * vy + EPS)
-    return torch.where(m.sum(dim=1) >= 2, corr, torch.full_like(corr, float("nan")))
+    # 有效样本过少(<30, 对齐 CPU run_ic_timeseries_panel "len(factor_df)<30 跳过")或
+    # 截面常数(方差≈0)时相关性无定义: 置 NaN 跳过该截面。
+    # 修复: 原阈值 5 过低, 5~29 只股票的小截面在 Spearman 下极易虚高(如 ts_PctChange 类
+    # 因子因 ts_VAR 产生大量 0 值、除零后非空率仅 ~5%, 每截面有效股票只有几只, 却算出
+    # -0.9x 的假 RankIC); 与 CPU 展示口径统一为 30 后这些截面被剔除, 假相关不再污染均值
+    valid = (m.sum(dim=1) >= 30) & (vx > EPS) & (vy > EPS)
+    return torch.where(valid, corr, torch.full_like(corr, float("nan")))
 
 
 @torch.no_grad()

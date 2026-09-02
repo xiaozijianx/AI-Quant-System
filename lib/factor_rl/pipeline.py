@@ -27,11 +27,12 @@ def _decode_formula(tokens) -> str:
     """token 序列 -> 本系统表达式字符串 (中缀, 可被 evaluate_expression 求值)
 
     用 DECODE_MAP 把 RL 算子名映射为本系统参数化表达式 (如 ts_Mean_5 -> ts_Mean(x, 5))。
-    特征叶子用 FEATURE_EXPRS 替换为本系统因子库表达式 (如 RET -> returns(1)), 加括号防优先级错乱。
+    特征叶子用 FEATURE_DECODE_EXPRS 替换为本系统因子库表达式 (如 RET -> ts_RobustNorm(returns(1),200)),
+    从而保证最终评估/入库的取值与 RL 训练时使用的 robust 归一化特征一致。
     """
     names = [FORMULA_VOCAB.token_names[t] if t < FORMULA_VOCAB.size else "?" for t in tokens]
     from .ops import OPERATOR_REGISTRY, DECODE_MAP
-    from .features import FEATURE_EXPRS
+    from .features import FEATURE_DECODE_EXPRS
     stack = []
     for name in names:
         if name in OPERATOR_REGISTRY:
@@ -56,10 +57,11 @@ def _decode_formula(tokens) -> str:
             except Exception:
                 return ""
         else:
-            fexpr = FEATURE_EXPRS.get(name)
+            fexpr = FEATURE_DECODE_EXPRS.get(name)
             stack.append(f"({fexpr})" if fexpr else name)
     if len(stack) == 1:
-        return stack[0]
+        # 套上 StackVM 输出标准化壳, 保证最终表达式与 RL 训练时的最终因子值一致
+        return f"ts_OutputNorm(({stack[0]}))"
     return ""
 
 
@@ -168,7 +170,7 @@ def run_rl_pipeline(body: dict, progress_cb=None, restart_cb=None, elite_cb=None
     codes = [c for c in codes if c in panel]
 
     # ============ 3. 三段分段 ============
-    from lib.factor_gp import split_train_test_dates, trim_panel_to_dates
+    from lib.factor_screening import split_train_test_dates, trim_panel_to_dates
     n = len(dates)
     train_end = int(n * train_ratio)
     val_end = int(n * (train_ratio + val_ratio))
@@ -273,7 +275,7 @@ def run_rl_pipeline(body: dict, progress_cb=None, restart_cb=None, elite_cb=None
     if exprs:
         # 7.1 测试段 OOS 复核
         try:
-            from lib.factor_gp import oos_recheck
+            from lib.factor_screening import oos_recheck
             from lib.factor_evaluator import get_pool_stocks
             oos_list = oos_recheck(
                 exprs[:return_candidates * 3], panel, prices_panel,
@@ -286,7 +288,7 @@ def run_rl_pipeline(body: dict, progress_cb=None, restart_cb=None, elite_cb=None
         # 7.2 Walk-Forward 重验证
         if n_folds >= 2:
             try:
-                from lib.factor_gp import walk_forward_recheck
+                from lib.factor_screening import walk_forward_recheck
                 wf_list = walk_forward_recheck(
                     exprs[:return_candidates * 3], panel, prices_panel,
                     str(dates[0]), str(dates[-1]),
@@ -299,7 +301,7 @@ def run_rl_pipeline(body: dict, progress_cb=None, restart_cb=None, elite_cb=None
         # 7.3 置换显著性检验
         if perm_n > 0:
             try:
-                from lib.factor_gp import permutation_significance
+                from lib.factor_screening import permutation_significance
                 perm_list = permutation_significance(
                     exprs[:return_candidates * 3], panel, prices_panel,
                     str(dates[0]), str(dates[-1]), n_perm=perm_n,
@@ -343,7 +345,7 @@ def run_rl_pipeline(body: dict, progress_cb=None, restart_cb=None, elite_cb=None
         # 7.5 去冗余 (dedup_by_corr)
         if candidates:
             try:
-                from lib.factor_gp import dedup_by_corr
+                from lib.factor_screening import dedup_by_corr
                 # 为 dedup 准备基本指标 (每候选需 ic_metric 字段)
                 for c in candidates:
                     c["rank_ic_mean"] = c["rank_ic"]

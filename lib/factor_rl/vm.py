@@ -91,7 +91,7 @@ class StackVM:
         padded = F.pad(x, (_ROLL_WINDOW - 1, 0), value=0.0)
         windows = padded.unfold(1, _ROLL_WINDOW, 1)
         ts_mean = windows.mean(dim=2)
-        ts_std = windows.std(dim=2, unbiased=False).clamp_min(1e-8)
+        ts_std = windows.std(dim=2).clamp_min(1e-8)
         ts_z = (x - ts_mean) / ts_std
         warmup_mask = torch.arange(T, device=x.device) < (_ROLL_WINDOW - 1)
         ts_z[:, warmup_mask] = 0.0
@@ -103,8 +103,7 @@ class StackVM:
         infected_chain = 0
         for token in formula_tokens:
             if token < self.feat_offset:
-                # 特征 token: 重置感染链 (特征本身有符号)
-                infected_chain = 0
+                # 特征 token: 不改变感染状态 (与原版 AlphaMaster 一致)
                 continue
             if token in self.positive_only_ids:
                 infected_chain += 1

@@ -1,0 +1,311 @@
+
+    <!-- 使用说明 modal (统一外壳组件, 本页 modal-body 带 text-sm 样式) -->
+    {% set help_title = '实盘监控' %}
+    {% set help_content_html %}
+            <div class="modal-body text-sm">
+                <p class="text-gray-700 leading-relaxed mb-3">
+                    本页负责<strong>自动跑策略循环</strong> (约每分钟一轮): 拉行情 → 算信号 → 风控 → 下单。
+                    默认<strong>模拟</strong>, 不会连券商; 选实盘前务必确认 miniQMT 与账户。
+                </p>
+
+                <h4 class="text-gray-900 font-medium mt-2 mb-1">怎么用 (三步)</h4>
+                <ol class="list-decimal pl-5 space-y-1.5 text-gray-700">
+                    <li>左侧「实时持仓」点右上 <strong>+ 添加股票</strong>, 输入代码并选策略 (如双均线), 确定后写盘并热加载。</li>
+                    <li>需要切换某只股票的策略时, 直接点「实时持仓」表里的<strong>策略名</strong>即可弹窗切换。</li>
+                    <li>右侧「资金面板」头部即是引擎开关 -- <strong>启动 / 停止</strong>; 持仓 / 信号 / 订单约 <strong>5 秒</strong>自动刷新。</li>
+                </ol>
+
+                <h4 class="text-gray-900 font-medium mt-4 mb-1">监控列表从哪来</h4>
+                <p class="text-gray-600 text-xs leading-relaxed">
+                    合并去重: mock 持仓 + watch_pool 列表 + 已绑定策略 (per_stock) 的代码; 「添加股票」会同时写 watch_pool 和 per_stock。
+                    A 股 <strong>T+1</strong>: 当日买的次日才能卖; 日 K 类策略往往比 5 分钟更贴合隔日节奏。
+                </p>
+
+                <h4 class="text-gray-900 font-medium mt-4 mb-1">引擎控制 / 风控 / 应急</h4>
+                <p class="text-gray-600 text-xs leading-relaxed">
+                    右侧「资金面板」头部带<strong>启动 / 停止</strong>按钮和状态徽章 (RUNNING / PAUSED / HALTED);
+                    下方有<strong>重置持仓 / 清空历史</strong>两条工具链接。
+                    更下方「风控」卡片是固定说明 (单笔 ≤10% 资金、亏 ≥2% 自动熔断);
+                    最底部「应急干预」(暂停买入 / 一键清仓 / 强制熔断) 平时折叠, 黑天鹅时才打开。
+                </p>
+
+                <h4 class="text-gray-900 font-medium mt-4 mb-1">进阶扩展</h4>
+                <ul class="list-disc pl-5 text-gray-600 text-xs space-y-1">
+                    <li><strong>兜底策略</strong>: 未在 per_stock 里指定的代码会走 <code>config/strategies.yaml</code> 的 <code>default</code>。</li>
+                    <li><strong>批量编辑 / 临时代码</strong>: 直接改 <code>config/watch_pool.yaml</code>、<code>config/strategies.yaml</code>; 修改后调 <code>POST /api/live/strategies/config</code> 触发热加载。</li>
+                    <li><strong>事件流</strong>: 每轮循环的耗时与信号数, 可在 <code>GET /api/live/state</code> 的 <code>events</code> 字段查看。</li>
+                </ul>
+            </div>
+    {% endset %}
+    {% include "_components/help_modal.html" %}
+
+    <!-- 添加股票并绑定策略 -->
+    <div class="modal-overlay" x-show="stockBind.show" x-cloak @click.self="stockBind.show = false">
+        <div class="modal-card" style="max-width:400px;">
+            <div class="modal-header">
+                <div class="modal-title">添加股票并绑定策略</div>
+                <button type="button" class="modal-close" @click="stockBind.show = false">×</button>
+            </div>
+            <div class="modal-body text-sm">
+                <p class="text-xs text-gray-600 mb-2 leading-relaxed">写入监控列表与 <code>strategies.yaml</code> 并热加载；出<strong>买/卖信号</strong>时由主循环按该策略计算。</p>
+                <p class="text-xs text-gray-400 mb-3 leading-relaxed border-l-2 border-gray-200 pl-2">
+                    <strong>买入数量</strong>不由本弹窗填写：主循环里按风控用「总资金 × 10% ÷ 现价」折算成股数（100 股一手），不足一手时按至少 100 股试探；详见右侧「风控」卡片。
+                </p>
+                <div class="mb-3">
+                    <div class="text-xs text-gray-600 mb-1">股票代码</div>
+                    <input type="text" class="form-input w-full font-mono text-sm"
+                           x-model="stockBind.code"
+                           placeholder="例: 002432.SZ">
+                </div>
+                <div class="mb-4">
+                    <div class="text-xs text-gray-600 mb-1">策略</div>
+                    <template x-if="strategyFlat.length > 0">
+                        <select class="form-input w-full" style="font-size:13px;" x-model="stockBind.strategy">
+                            <option value="">请选择策略</option>
+                            <template x-for="s in strategyFlat" :key="'bindopt-' + s.name">
+                                <option :value="s.name" x-text="'[' + s.group + '] ' + s.label"></option>
+                            </template>
+                        </select>
+                    </template>
+                    <template x-if="strategyFlat.length === 0">
+                        <div class="text-gray-400 text-xs">策略列表加载中...</div>
+                    </template>
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="btn btn-secondary btn-sm" @click="stockBind.show = false">取消</button>
+                    <button type="button" class="btn btn-primary btn-sm" @click="confirmStockBind()">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 策略详情 + 切换 (持仓表 / 绑定表 共用): 点策略名弹出, 直接看说明并切换 -->
+    <div class="modal-overlay" x-show="strategyDetailForPos.show" x-cloak
+         @click.self="strategyDetailForPos.show = false">
+        <div class="modal-card strategy-help-modal" style="max-width:480px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    策略说明
+                    <span class="text-xs text-gray-500 font-mono ml-2"
+                          x-show="strategyDetailForPos.code"
+                          x-text="strategyDetailForPos.code"></span>
+                </div>
+                <button type="button" class="modal-close" @click="strategyDetailForPos.show = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="strategy-help-title">
+                    当前: <span x-text="strategyDetailForPos.label"></span>
+                </div>
+
+                <template x-if="strategyDetailForPos.scenario || strategyDetailForPos.rules || strategyDetailForPos.example">
+                    <div>
+                        <div class="strategy-help-block" x-show="strategyDetailForPos.scenario">
+                            <div class="strategy-help-label">适用场景</div>
+                            <p class="strategy-help-text" x-text="strategyDetailForPos.scenario"></p>
+                        </div>
+                        <div class="strategy-help-block" x-show="strategyDetailForPos.rules">
+                            <div class="strategy-help-label">规则说明</div>
+                            <p class="strategy-help-text" x-text="strategyDetailForPos.rules"></p>
+                        </div>
+                        <div class="strategy-help-block" x-show="strategyDetailForPos.example">
+                            <div class="strategy-help-label">示例</div>
+                            <p class="strategy-help-text" x-text="strategyDetailForPos.example"></p>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!(strategyDetailForPos.scenario || strategyDetailForPos.rules || strategyDetailForPos.example) && strategyDetailForPos.desc">
+                    <p class="strategy-help-text" x-text="strategyDetailForPos.desc"></p>
+                </template>
+
+                <!-- 直接切换为其他策略 (无需再去右侧表格) -->
+                <div class="strategy-help-block" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:14px;"
+                     x-show="strategyDetailForPos.code">
+                    <div class="strategy-help-label">切换为其他策略</div>
+                    <div class="flex gap-2 mt-1.5">
+                        <select class="form-input flex-1" style="font-size:12px;padding:4px 8px;"
+                                x-model="strategyDetailForPos.switchTo">
+                            <option value="" style="color:#9ca3af;">(不绑定 — 该股不再出信号)</option>
+                            <template x-for="s in strategyFlat" :key="'sw-' + s.name">
+                                <option :value="s.name" x-text="'[' + s.group + '] ' + s.label"></option>
+                            </template>
+                        </select>
+                        <button type="button" class="btn btn-primary btn-sm"
+                                style="padding:4px 12px;font-size:12px;"
+                                @click="confirmSwitchStrategy()"
+                                :disabled="strategyDetailForPos.switchTo === resolvedExecStrategy(strategyDetailForPos.code)
+                                           && hasBinding(strategyDetailForPos.code) === !!strategyDetailForPos.switchTo">
+                            保存
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1.5 mb-0 leading-relaxed">
+                        选「<b>(不绑定)</b>」保存 = 解绑, 引擎不再出信号; 选具体策略 = 切换并热加载,
+                        下一轮循环 (约 1 分钟) 生效。配置写入 <code>strategies.yaml</code>。
+                    </p>
+                </div>
+
+                <!-- 进入交易计划模式 -->
+                <div class="strategy-help-block" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:14px;"
+                     x-show="strategyDetailForPos.code">
+                    <div class="strategy-help-label">交易计划</div>
+                    <button type="button" class="btn btn-primary btn-sm mt-1.5"
+                            style="padding:4px 12px;font-size:12px;"
+                            @click="setExecutionMode(strategyDetailForPos.code, 'plan'); strategyDetailForPos.show = false;">
+                        进入交易计划模式
+                    </button>
+                    <p class="text-xs text-gray-500 mt-1.5 mb-0 leading-relaxed">
+                        切换后该股使用交易计划执行; 若暂无交易计划, 会在列表中显示为虚线按钮, 点击即可生成默认计划。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 立即试算结果弹窗: 展示每只股票的 buy/sell/hold + 原因 -->
+    <div class="modal-overlay" x-show="trialResult !== null" x-cloak @click.self="trialResult = null">
+        <div class="modal-card" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    试算结果
+                    <span class="text-xs text-gray-500 ml-2" x-show="trialResult"
+                          x-text="'共 ' + (trialResult?.summary?.total || 0) + ' 只'"></span>
+                </div>
+                <button type="button" class="modal-close" @click="trialResult = null">×</button>
+            </div>
+            <div class="modal-body" x-show="trialResult">
+                <div class="text-xs text-gray-700 mb-3 leading-relaxed">
+                    引擎按当前最近一根 K 线对监控池里每只股票各跑一遍策略。
+                    <b class="text-emerald-700">buy</b> / <b class="text-rose-700">sell</b> 已写到下方「信号」表;
+                    <b class="text-gray-500">hold</b> 表示当前条件不满足, 不出信号 (这就是「为什么没看到信号」的常见原因)。
+                </div>
+                <div class="flex gap-3 text-sm mb-3">
+                    <span class="badge badge-success" x-text="'buy ' + (trialResult?.summary?.buy || 0)"></span>
+                    <span class="badge badge-danger"  x-text="'sell ' + (trialResult?.summary?.sell || 0)"></span>
+                    <span class="badge badge-info"    style="background:#f3f4f6;color:#374151;"
+                          x-text="'hold ' + (trialResult?.summary?.hold || 0)"></span>
+                    <template x-if="(trialResult?.summary?.error || 0) > 0">
+                        <span class="badge badge-danger"
+                              x-text="'error ' + trialResult.summary.error"></span>
+                    </template>
+                </div>
+                <table class="app-table" x-show="(trialResult?.diagnoses || []).length > 0">
+                    <thead><tr>
+                        <th>代码</th><th>策略</th><th>方向</th><th>原因</th>
+                    </tr></thead>
+                    <tbody>
+                        <template x-for="(d, i) in (trialResult?.diagnoses || [])" :key="i">
+                            <tr>
+                                <td><code x-text="d.code"></code></td>
+                                <td>
+                                    <span class="badge badge-info" style="font-size:10px;"
+                                          x-text="d.strategy"></span>
+                                </td>
+                                <td>
+                                    <span class="badge"
+                                          :class="d.side === 'buy' ? 'badge-success' :
+                                                  d.side === 'sell' ? 'badge-danger' :
+                                                  d.side === 'error' ? 'badge-danger' : ''"
+                                          :style="d.side === 'hold' ? 'background:#f3f4f6;color:#6b7280;' : ''"
+                                          x-text="d.side"></span>
+                                </td>
+                                <td class="text-xs text-gray-600" x-text="d.reason || '-'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @click="trialResult = null">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 实盘委托弹窗 (从「实盘账户」卡片头部按钮点开) -->
+    <div class="modal-overlay" x-show="showRealOrders" x-cloak @click.self="showRealOrders = false">
+        <div class="modal-card" style="max-width:780px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    今日委托 (miniQMT)
+                    <span class="text-xs text-gray-500 ml-2"
+                          x-text="(realAccount.orders || []).length + ' 笔'
+                                  + (pendingRealOrders().length ? ' · 未结 ' + pendingRealOrders().length : '')"></span>
+                </div>
+                <button type="button" class="modal-close" @click="showRealOrders = false">×</button>
+            </div>
+            <div class="modal-body">
+                <template x-if="(realAccount.orders || []).length === 0">
+                    <div class="text-gray-400 text-sm py-6 text-center">(今日暂无委托)</div>
+                </template>
+                <template x-if="(realAccount.orders || []).length > 0">
+                    <div class="overflow-x-auto">
+                    <table class="app-table">
+                        <thead><tr>
+                            <th>编号</th>
+                            <th>代码</th>
+                            <th>方向</th>
+                            <th class="text-right">委托</th>
+                            <th class="text-right">已成</th>
+                            <th class="text-right">价格</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr></thead>
+                        <tbody>
+                            <template x-for="o in (realAccount.orders || [])" :key="o.order_id">
+                                <tr>
+                                    <td><code class="text-xs" x-text="o.order_id"></code></td>
+                                    <td><code x-text="o.stock_code"></code></td>
+                                    <td>
+                                        <span class="badge"
+                                              :class="o.side === 'buy' ? 'badge-danger' : 'badge-success'"
+                                              x-text="o.side === 'buy' ? '买' : (o.side === 'sell' ? '卖' : o.side)"></span>
+                                    </td>
+                                    <td class="text-right num" x-text="App.fmtNum(o.order_volume, 0)"></td>
+                                    <td class="text-right num" x-text="App.fmtNum(o.traded_volume, 0)"></td>
+                                    <td class="text-right num" x-text="o.price > 0 ? App.fmtNum(o.price, 2) : '市价'"></td>
+                                    <td>
+                                        <span class="text-xs"
+                                              :class="o.cancelable ? 'text-yellow-700' : (o.order_status === 57 ? 'text-green-700' : 'text-gray-500')"
+                                              x-text="o.status_text"></span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-secondary btn-xs"
+                                                x-show="o.cancelable"
+                                                :disabled="cancelBusyId === o.order_id"
+                                                @click="cancelRealOrder(o)"
+                                                x-text="cancelBusyId === o.order_id ? '撤单中...' : '撤单'"></button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    </div>
+                </template>
+                <p class="text-xs text-gray-400 mt-3 mb-0 leading-relaxed">
+                    数据来自 miniQMT <code>query_stock_orders()</code>, 自动 5 秒刷新。
+                    未结(未报/待报/已报/部成待撤) 可撤单; 已成 / 已撤为终态。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 顶部视图切换: 模拟盘 / 实盘 -- 用独立 URL (/live/sim, /live/real), 可分享 / 收藏 -->
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="inline-flex rounded-md overflow-hidden border border-gray-200 bg-white shadow-sm">
+            <a href="/live/sim"
+               class="px-5 py-2 text-sm font-medium transition-colors no-underline"
+               :class="viewMode === 'sim' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'">
+                模拟盘
+            </a>
+            <a href="/live/real"
+               class="px-5 py-2 text-sm font-medium transition-colors border-l border-gray-200 no-underline"
+               :class="viewMode === 'real' ? 'bg-red-600 text-white' : 'text-gray-700 hover:bg-gray-50'">
+                实盘
+            </a>
+        </div>
+        <div class="text-xs text-gray-500" x-show="viewMode === 'sim'">
+            模拟盘 (<code>/live/sim</code>): 自动跑策略, 不会真实下单
+        </div>
+        <div class="text-xs text-red-700" x-show="viewMode === 'real'">
+            实盘 (<code>/live/real</code>): 持仓 / 资金来自 miniQMT; 下单走「AI 信号 → 手动授权」, 引擎不直接下单
+        </div>
+    </div>
+

@@ -20,6 +20,7 @@ import math
 import os
 import random
 import heapq
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import torch
 from torch.distributions import Categorical
@@ -76,6 +77,12 @@ class AlphaEngine:
         self.wf_gap = int(self.cfg.get("wf_gap", 20) or 20)
         self.random_state = int(self.cfg.get("random_state", 42))
 
+        # 并行公式评估 (复刻原版 ThreadPoolExecutor)
+        self.parallel_eval = bool(self.cfg.get("parallel_eval", True))
+        self.eval_workers = int(self.cfg.get("eval_workers", min(os.cpu_count() or 4, 8)))
+        self._eval_pool = None
+        self._eval_workers = 1
+
         # 奖励
         self.bt = RLBacktest(
             ic_weight=float(self.cfg.get("reward_ic_weight", 1.0)),
@@ -97,6 +104,9 @@ class AlphaEngine:
         self.sampler = ConstrainedSampler(
             FORMULA_VOCAB.size, FORMULA_VOCAB.operator_offset,
             self.vm.arity_map, self.vm.positive_only_ids)
+
+        # 并行评估线程池
+        self._init_parallel_eval()
 
         # 状态
         self.best_score = -float("inf")
@@ -202,10 +212,11 @@ class AlphaEngine:
             norm_scores = (scores - s_min) / (s_max - s_min)
         else:
             norm_scores = np.ones_like(scores)
-        # softmax (温度 0.5)。必须除以 probs 自身的和, 不能加 1e-8 再做分母:
+        # softmax (温度 0.5), 与原版 AlphaMaster 完全一致: 2.0 ** (norm / temp)。
+        # 必须除以 probs 自身的和, 不能加 1e-8 再做分母:
         # 否则 p.sum() 恒偏小 1e-8 量级, 会触发 np.random.choice 抛
         # "probabilities do not sum to 1" (batch=192 下约第 20 步必现)。
-        probs = np.exp(np.clip(norm_scores / 0.5, -50.0, 50.0)) * weights
+        probs = np.power(2.0, np.clip(norm_scores / 0.5, -50.0, 50.0)) * weights
         total = probs.sum()
         if not np.isfinite(total) or total <= 0:
             probs = np.ones_like(probs)
@@ -240,33 +251,40 @@ class AlphaEngine:
         return lp, [f[:self.max_formula_len] for f in formulas]
 
     # ============================================================
-    # Part C: 评估
+    # 并行公式评估 (复刻原版 ThreadPoolExecutor)
     # ============================================================
-    def _evaluate(self, formulas, feat_tensor, future_ret, rebal_period, fold_specs=None):
-        """评估公式列表, 返回 (rewards, results)
+    def _init_parallel_eval(self):
+        """初始化并行评估线程池"""
+        if not self.parallel_eval or self._eval_pool is not None:
+            return
+        self._eval_workers = max(1, int(self.eval_workers))
+        try:
+            self._eval_pool = ThreadPoolExecutor(
+                max_workers=self._eval_workers,
+                thread_name_prefix="rl-eval",
+            )
+        except Exception:
+            self._eval_pool = None
+            self._eval_workers = 1
 
-        fold_specs: 提供时按 walk-forward 折叠逐折评估 (训练段得分进梯度,
-                    验证段得分 x OOS 门控选冠军); 缺省时用全区间单次评估 (兼容旧行为)。
-        """
-        rewards = []
-        results = []
-        for fml in formulas:
+    def _eval_formula_task(self, idx, fml, feat_tensor, future_ret,
+                           rebal_period, fold_specs, factor_pool_snapshot):
+        """评估单条公式 (线程安全, 只读 self.vm/self.bt, factor_pool 用快照)"""
+        with torch.no_grad():
             # 1. StackVM 执行
             res = self.vm.execute(fml, feat_tensor)
             if res is None:
-                rewards.append(-5.0)
-                results.append({"reward": -5.0, "val_score": -5.0, "rank_ic_mean": 0.0,
-                                "rank_ic_ir": 0.0, "layered": 0.0, "complexity_penalty": 0.0,
-                                "corr_penalty_applied": False, "valid": False})
-                continue
+                return idx, -5.0, {"reward": -5.0, "val_score": -5.0, "rank_ic_mean": 0.0,
+                                   "rank_ic_ir": 0.0, "layered": 0.0,
+                                   "complexity_penalty": 0.0,
+                                   "corr_penalty_applied": False, "valid": False}
             # 2. 常数因子拦截
             if res.std() < 1e-4:
-                rewards.append(-2.0)
-                results.append({"reward": -2.0, "val_score": -2.0, "rank_ic_mean": 0.0,
-                                "rank_ic_ir": 0.0, "layered": 0.0, "complexity_penalty": 0.0,
-                                "corr_penalty_applied": False, "valid": False})
-                continue
-            pool = [p[2] for p in self.factor_pool[-20:]] if self.factor_pool else None
+                return idx, -2.0, {"reward": -2.0, "val_score": -2.0, "rank_ic_mean": 0.0,
+                                   "rank_ic_ir": 0.0, "layered": 0.0,
+                                   "complexity_penalty": 0.0,
+                                   "corr_penalty_applied": False, "valid": False}
+            pool = [p[2] for p in factor_pool_snapshot[-20:]] if factor_pool_snapshot else None
             if fold_specs:
                 # 3a. walk-forward 多折: 训练段得分均值进梯度, 验证段得分均值选冠军
                 train_scores, val_scores, ic_scores = [], [], []
@@ -277,12 +295,10 @@ class AlphaEngine:
                     val_scores.append(vs_s)
                     ic_scores.append(tic)
                 if not train_scores:
-                    rewards.append(-5.0)
-                    results.append({"reward": -5.0, "val_score": -5.0, "rank_ic_mean": 0.0,
-                                    "rank_ic_ir": 0.0, "layered": 0.0,
-                                    "complexity_penalty": 0.0,
-                                    "corr_penalty_applied": False, "valid": False})
-                    continue
+                    return idx, -5.0, {"reward": -5.0, "val_score": -5.0, "rank_ic_mean": 0.0,
+                                       "rank_ic_ir": 0.0, "layered": 0.0,
+                                       "complexity_penalty": 0.0,
+                                       "corr_penalty_applied": False, "valid": False}
                 r = {"reward": float(np.mean(train_scores)),
                      "val_score": float(np.mean(val_scores)),
                      "rank_ic_mean": float(np.mean(ic_scores)),
@@ -298,8 +314,36 @@ class AlphaEngine:
             if rep > 0:
                 r["reward"] = r["reward"] - rep
                 r["val_score"] = r["val_score"] - rep
-            rewards.append(r["reward"])
-            results.append(r)
+            return idx, r["reward"], r
+
+    # ============================================================
+    # Part C: 评估
+    # ============================================================
+    def _evaluate(self, formulas, feat_tensor, future_ret, rebal_period, fold_specs=None):
+        """评估公式列表, 返回 (rewards, results)
+
+        fold_specs: 提供时按 walk-forward 折叠逐折评估 (训练段得分进梯度,
+                    验证段得分 x OOS 门控选冠军); 缺省时用全区间单次评估 (兼容旧行为)。
+        """
+        pool_snapshot = list(self.factor_pool)
+        if self._eval_pool is not None and len(formulas) > 1:
+            futures = [
+                self._eval_pool.submit(
+                    self._eval_formula_task, i, fml, feat_tensor, future_ret,
+                    rebal_period, fold_specs, pool_snapshot,
+                )
+                for i, fml in enumerate(formulas)
+            ]
+            outputs = [f.result() for f in futures]
+        else:
+            outputs = [
+                self._eval_formula_task(i, fml, feat_tensor, future_ret,
+                                        rebal_period, fold_specs, pool_snapshot)
+                for i, fml in enumerate(formulas)
+            ]
+        outputs.sort(key=lambda x: x[0])
+        rewards = [o[1] for o in outputs]
+        results = [o[2] for o in outputs]
         return rewards, results
 
     # ============================================================

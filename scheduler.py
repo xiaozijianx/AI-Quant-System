@@ -140,7 +140,7 @@ def job_morning_brief():
         log.info("[JOB] 晨会分析 - 已禁用, 跳过")
         return
     try:
-        from morning_brief.graph import build_graph
+        from services.morning.brief.graph import build_graph
         graph = build_graph()
         result = graph.invoke({
             "trigger_time":     datetime.now().isoformat(timespec="seconds"),

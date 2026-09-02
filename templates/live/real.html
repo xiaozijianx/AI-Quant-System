@@ -1,0 +1,893 @@
+    <!-- ======== 实盘视图 ======== -->
+    <div x-show="viewMode === 'real'" x-cloak>
+        <!-- 顶部摘要条: miniQMT 连接状态 + 5 个 stat 卡片
+             已连接 -> 头部一行简洁信息 + stat 卡片
+             未连接 -> 头部一行 + 一段折叠说明 (默认折叠, 鼠标点开) -->
+        <div class="card mb-3" style="padding:12px 14px;">
+            <!-- 头部: 状态徽章 + 操作链接 -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-semibold text-sm">实盘账户 (miniQMT)</span>
+                <span class="badge"
+                      :class="realAccount.connected ? 'badge-success' : 'badge-danger'"
+                      x-text="realAccount.connected ? '已连接' : '未连接'"></span>
+
+                <!-- 已连接: 显示委托数 + 缓存秒数 -->
+                <template x-if="realAccount.connected">
+                    <span class="flex items-center gap-2 flex-wrap">
+                        <button type="button" class="text-xs text-indigo-600 hover:underline ml-1"
+                                @click="showRealOrders = true"
+                                x-text="'今日委托 ' + (realAccount.orders || []).length + (pendingRealOrders().length ? ' · 未结 ' + pendingRealOrders().length : '')"></button>
+                        <button type="button" class="text-xs text-indigo-600 hover:underline"
+                                @click="refreshRealAccount(true)">刷新</button>
+                        <span class="text-xs text-gray-400"
+                              x-show="realAccount.cached_age_sec >= 0"
+                              x-text="'(' + realAccount.cached_age_sec + 's 前更新)'"></span>
+                    </span>
+                </template>
+
+                <!-- 未连接: 一个"为什么"按钮, 折叠详细说明 -->
+                <template x-if="!realAccount.connected">
+                    <span class="flex items-center gap-2">
+                        <button type="button" class="text-xs text-gray-600 hover:underline"
+                                @click="realHelpOpen = !realHelpOpen"
+                                x-text="realHelpOpen ? '▼ 收起说明' : '▶ 为什么没连上?'"></button>
+                        <button type="button" class="text-xs text-indigo-600 hover:underline"
+                                @click="refreshRealAccount(true)">重试连接</button>
+                    </span>
+                </template>
+            </div>
+
+            <!-- 未连接的详细说明: 默认折叠 -->
+            <template x-if="!realAccount.connected">
+                <div x-show="realHelpOpen" x-cloak x-transition
+                     class="text-xs text-gray-600 leading-relaxed mt-2 pl-1 border-l-2 border-gray-200 ml-1 pl-3">
+                    <ol class="list-decimal pl-4 space-y-0.5">
+                        <li>本机已登录 <b>QMT 极简版</b> 客户端</li>
+                        <li>在本项目根目录 <code>.env</code> 中配置 <code>QMT_PATH</code> 与 <code>ACCOUNT_ID</code> 后重启 app</li>
+                        <li>交易日 09:00 后才激活, 凌晨可能查询失败</li>
+                    </ol>
+                    <p class="text-xs text-gray-400 mt-1 break-all font-mono" x-show="realAccount.error"
+                       x-text="realAccount.error"></p>
+                </div>
+            </template>
+
+            <!-- stat 卡片条: 5 个核心数字 -->
+            <template x-if="realAccount.connected">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-1">
+                    <div class="rounded p-2 border bg-white">
+                        <div class="text-xs text-gray-500">总资产</div>
+                        <div class="num text-lg font-semibold leading-tight"
+                             x-text="App.fmtNum(realAccount.asset.total_asset, 0)"></div>
+                    </div>
+                    <div class="rounded p-2 border bg-white">
+                        <div class="text-xs text-gray-500">可用现金</div>
+                        <div class="num text-lg font-semibold text-emerald-700 leading-tight"
+                             x-text="App.fmtNum(realAccount.asset.cash, 0)"></div>
+                        <div class="text-xs text-gray-400" x-show="realAccount.asset.frozen_cash > 0"
+                             x-text="'冻结 ' + App.fmtNum(realAccount.asset.frozen_cash, 0)"></div>
+                    </div>
+                    <div class="rounded p-2 border bg-white">
+                        <div class="text-xs text-gray-500">市值 / 浮盈</div>
+                        <div class="num text-lg font-semibold text-indigo-700 leading-tight"
+                             x-text="App.fmtNum(realAccount.asset.market_value, 0)"></div>
+                        <div class="text-xs num" x-show="realPosTotalPnl() !== null"
+                             :class="App.pnlClass(realPosTotalPnl())"
+                             x-text="App.fmtSign(realPosTotalPnl(), 0) + ' (' + App.fmtPct(realPosTotalPnlPct(), 2) + ')'"></div>
+                    </div>
+                    <div class="rounded p-2 border bg-white">
+                        <div class="text-xs text-gray-500">持仓 / 已绑策略</div>
+                        <div class="num text-lg font-semibold leading-tight"
+                             x-text="(realAccount.positions || []).length + ' 只'"></div>
+                        <div class="text-xs text-gray-400"
+                             x-text="'绑 ' + realStratCoverage().bound + ' / ' + realStratCoverage().total"></div>
+                    </div>
+                    <div class="rounded p-2 border"
+                         :class="approvalStats().pending > 0 ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-200'">
+                        <div class="text-xs"
+                             :class="approvalStats().pending > 0 ? 'text-yellow-700' : 'text-gray-500'">待授权</div>
+                        <div class="num font-bold leading-tight"
+                             :class="approvalStats().pending > 0 ? 'text-2xl text-yellow-700' : 'text-lg text-gray-400'"
+                             x-text="approvalStats().pending"></div>
+                        <div class="text-xs text-gray-500">
+                            已下单 <span class="text-green-700" x-text="approvalStats().approved"></span> ·
+                            过期 <span x-text="approvalStats().expired"></span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- 左侧: 持仓 + 自选池 + 策略信号 | 右侧: AI信号授权 -->
+        <div class="grid-2">
+            <div class="flex-col">
+            <!-- 持仓表 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">实盘持仓
+                        <span class="text-gray-400 font-normal text-xs"
+                              x-text="'(' + (realAccount.positions || []).length + ' 只)'"></span>
+                    </div>
+                    <span class="text-xs text-gray-400">执行方式 = 策略 / 交易计划 · 行 hover 看可用 / 市值</span>
+                </div>
+
+                <template x-if="!realAccount.connected">
+                    <div class="text-gray-400 text-sm py-6 text-center">未连接 miniQMT</div>
+                </template>
+                <template x-if="realAccount.connected && (realAccount.positions || []).length === 0">
+                    <div class="text-gray-400 text-sm py-6 text-center">(账户暂无持仓)</div>
+                </template>
+                <template x-if="realAccount.connected && (realAccount.positions || []).length > 0">
+                    <div class="overflow-x-auto">
+                    <table class="app-table" style="table-layout:fixed;width:100%;">
+                        <thead><tr>
+                            <th style="width:95px;">代码</th>
+                            <th style="width:62px;" class="text-right">持仓</th>
+                            <th style="width:68px;" class="text-right">成本</th>
+                            <th style="width:68px;" class="text-right">现价</th>
+                            <th style="width:82px;" class="text-right">浮盈</th>
+                            <th style="width:62px;" class="text-right">%</th>
+                            <th style="width:236px;">执行方式</th>
+                        </tr></thead>
+                        <template x-for="p in realAccount.positions" :key="p.stock_code">
+                            <tbody>
+                                <tr :title="'可用 ' + App.fmtNum(p.can_use_volume, 0)
+                                           + ' (T+1 限制)\n市值 ' + App.fmtNum(p.market_value, 0)">
+                                    <td><code x-text="p.stock_code"></code></td>
+                                    <td class="text-right num" x-text="App.fmtNum(p.volume, 0)"></td>
+                                    <td class="text-right num" x-text="App.fmtNum(p.open_price, 2)"></td>
+                                    <td class="text-right num" x-text="realPosCurPrice(p) > 0 ? App.fmtNum(realPosCurPrice(p), 2) : '—'"></td>
+                                    <td class="text-right num" :class="App.pnlClass(realPosPnl(p))"
+                                        x-text="realPosPnl(p) === null ? '—' : App.fmtSign(realPosPnl(p), 0)"></td>
+                                    <td class="text-right num" :class="App.pnlClass(realPosPnlPct(p))"
+                                        x-text="realPosPnlPct(p) === null ? '—' : App.fmtPct(realPosPnlPct(p), 2)"></td>
+                                    <td style="padding:10px 4px;">
+                                            <div class="flex items-center gap-0.5">
+                                                <!-- 策略 -->
+                                                <button type="button"
+                                                        x-show="isStrategyMode(p.stock_code)"
+                                                        class="btn btn-strategy btn-xs flex-none justify-center text-left"
+                                                        style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                        @click="openPositionStrategyModal(p.stock_code)"
+                                                        :title="'策略 id: ' + resolvedExecStrategy(p.stock_code) + ' (点击查看说明 / 切换)'"
+                                                        x-text="resolvedExecStrategyLabel(p.stock_code)"></button>
+                                                <button type="button"
+                                                        x-show="!isPlanMode(p.stock_code) && !isStrategyMode(p.stock_code)"
+                                                        class="btn btn-strategy btn-xs flex-none justify-center"
+                                                        style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                        @click="openPositionStrategyModal(p.stock_code)">选择策略</button>
+                                                <!-- 交易计划 -->
+                                                <button type="button"
+                                                        x-show="isPlanMode(p.stock_code) && planActive(normCode(p.stock_code))"
+                                                        class="btn btn-plan btn-xs flex-none justify-center"
+                                                        style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                        @click="togglePlanExpand(normCode(p.stock_code))"
+                                                        title="点击展开计划摘要, 再次点击收起">
+                                                    交易计划
+                                                </button>
+                                                <a :href="'/trade-plan/' + normCode(p.stock_code) + '?plan_type=live'"
+                                                   x-show="isPlanMode(p.stock_code) && hasPlan(normCode(p.stock_code)) && !planActive(normCode(p.stock_code))"
+                                                   class="btn btn-warning btn-xs flex-none justify-center inline-flex items-center"
+                                                   style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                   title="计划未生效, 点击到详情页勾选「生效」后引擎才会执行">
+                                                    待确认
+                                                </a>
+                                                <a :href="'/trade-plan/' + normCode(p.stock_code) + '?plan_type=live'"
+                                                   x-show="isPlanMode(p.stock_code) && !hasPlan(normCode(p.stock_code))"
+                                                   class="btn btn-plan btn-xs flex-none justify-center inline-flex items-center"
+                                                   style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                   title="暂无交易计划, 点击生成">
+                                                    + 交易计划
+                                                </a>
+                                                <button type="button"
+                                                        x-show="isPlanMode(p.stock_code)"
+                                                        class="btn btn-outline-danger btn-xs flex-none justify-center"
+                                                        style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                        @click="cancelPlanInPosition(normCode(p.stock_code))"
+                                                        title="清除交易计划执行方式, 该股变为纯持仓(不再产生信号)">
+                                                    取消计划
+                                                </button>
+                                                <a :href="'/trade-plan/' + normCode(p.stock_code) + '?plan_type=live'"
+                                                   x-show="!isPlanMode(p.stock_code) && !isStrategyMode(p.stock_code)"
+                                                   class="btn btn-plan btn-xs flex-none justify-center inline-flex items-center"
+                                                   style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                   title="创建交易计划">+ 交易计划</a>
+                                                <!-- 强制卖出 -->
+                                                <button type="button"
+                                                        class="btn btn-danger btn-xs flex-none justify-center"
+                                                        style="width:72px;padding:2px 4px;font-size:11px;white-space:nowrap;"
+                                                        @click="confirmForceSell(normCode(p.stock_code))"
+                                                        title="忽略策略/计划, 下一轮主循环直接市价卖出该票">
+                                                    强制卖出
+                                                </button>
+                                            </div>
+                                        </td>
+                                </tr>
+                                <!-- 交易计划展开: 逐条显示止盈/止损/加仓条件 -->
+                                <tr x-show="expandedPlan === normCode(p.stock_code)" x-cloak
+                                    class="bg-blue-50/50">
+                                    <td colspan="7" class="py-2 px-3">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="flex-1 text-xs text-gray-700 space-y-2">
+                                                <template x-if="planDetailCache[p.stock_code]">
+                                                    <div>
+                                                        <div class="flex flex-col gap-1 mb-2">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="font-semibold">交易计划</span>
+                                                                <span class="badge text-[10px]"
+                                                                      :class="(planIndex[normCode(p.stock_code)]||{}).is_active ? 'badge-success' : 'badge-warning'"
+                                                                      :title="(planIndex[normCode(p.stock_code)]||{}).is_active ? '已生效：引擎会自动按条件下单' : '计划未生效：点击「待确认」到详情页勾选「生效」'"
+                                                                      x-text="(planIndex[normCode(p.stock_code)]||{}).is_active ? '生效' : '待确认'"></span>
+                                                                <span class="text-gray-500">目标仓位 <span class="font-mono"
+                                                                      x-text="((planIndex[normCode(p.stock_code)].target_ratio_min || 0) * 100).toFixed(0) + '% - ' + ((planIndex[normCode(p.stock_code)].target_ratio_max || 0) * 100).toFixed(0) + '%'"></span></span>
+                                                                <span class="text-gray-400">·</span>
+                                                                <span class="text-gray-500">当前价 <span class="font-mono"
+                                                                      x-text="realPosCurPrice(p) > 0 ? '¥' + realPosCurPrice(p).toFixed(2) : '—'"></span></span>
+                                                            </div>
+                                                            <div class="text-[10px] text-gray-400"
+                                                                 x-text="(planIndex[normCode(p.stock_code)]||{}).is_active
+                                                                     ? '已生效：引擎会按条件自动下单'
+                                                                     : '计划未生效：需先到详情页勾选「生效」'"></div>
+                                                        </div>
+
+                                                        <!-- 止盈 -->
+                                                        <template x-if="(planDetailCache[p.stock_code].exit_plan?.take_profit || []).length > 0">
+                                                            <div class="mb-2">
+                                                                <div class="text-green-700 font-medium mb-1">止盈</div>
+                                                                <div class="space-y-1">
+                                                                    <template x-for="(cond, idx) in planDetailCache[p.stock_code].exit_plan.take_profit" :key="idx">
+                                                                        <div class="py-1 px-2 rounded bg-white/60">
+                                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                                <div class="font-medium text-gray-800"
+                                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                                <div class="text-gray-600 shrink-0 font-medium"
+                                                                                     x-text="conditionDistanceText(cond, realPosCurPrice(p))"></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+
+                                                        <!-- 止损 -->
+                                                        <template x-if="(planDetailCache[p.stock_code].exit_plan?.stop_loss || []).length > 0">
+                                                            <div class="mb-2">
+                                                                <div class="text-red-700 font-medium mb-1">止损</div>
+                                                                <div class="space-y-1">
+                                                                    <template x-for="(cond, idx) in planDetailCache[p.stock_code].exit_plan.stop_loss" :key="idx">
+                                                                        <div class="py-1 px-2 rounded bg-white/60">
+                                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                                <div class="font-medium text-gray-800"
+                                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                                <div class="text-gray-600 shrink-0 font-medium"
+                                                                                     x-text="conditionDistanceText(cond, realPosCurPrice(p))"></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+
+                                                        <!-- 加仓 -->
+                                                        <template x-if="(planDetailCache[p.stock_code].add_position_conditions || []).length > 0">
+                                                            <div>
+                                                                <div class="text-indigo-700 font-medium mb-1">加仓</div>
+                                                                <div class="space-y-1">
+                                                                    <template x-for="(cond, idx) in planDetailCache[p.stock_code].add_position_conditions" :key="idx">
+                                                                        <div class="py-1 px-2 rounded bg-white/60">
+                                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                                <div class="font-medium text-gray-800"
+                                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                                <div class="text-gray-600 shrink-0 font-medium"
+                                                                                     x-text="conditionDistanceText(cond, realPosCurPrice(p))"></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                                <template x-if="!planDetailCache[p.stock_code]">
+                                                    <div class="text-gray-400">加载中...</div>
+                                                </template>
+                                            </div>
+                                            <a :href="'/trade-plan/' + p.stock_code + '?plan_type=live'"
+                                               class="btn btn-plan btn-xs shrink-0"
+                                               style="padding:2px 10px;font-size:11px;">查看/编辑</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </template>
+                    </table>
+                    </div>
+                </template>
+            </div>
+
+            <!-- 实盘待入场: 已绑策略/交易计划, 但 miniQMT 中暂无实际持仓 -->
+            <div class="card" x-show="realPendingRows().length > 0">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">待入场
+                            <span class="text-gray-400 font-normal text-xs"
+                                  x-text="'(' + realPendingRows().length + ' 只)'"></span>
+                        </div>
+                        <div class="text-xs text-gray-500 font-normal mt-0.5">
+                            已绑策略/交易计划, 但 miniQMT 中暂无实际持仓
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                <table class="app-table" style="table-layout:fixed;width:100%;">
+                    <thead><tr>
+                        <th style="width:110px;">代码</th>
+                        <th style="width:110px;">名称</th>
+                        <th style="width:70px;" class="text-right">最高价</th>
+                        <th style="width:70px;" class="text-right">最新价</th>
+                        <th style="width:65px;" class="text-right">涨跌额</th>
+                        <th style="width:70px;" class="text-right">涨跌幅</th>
+                        <th style="width:170px;">执行方式</th>
+                        <th style="width:55px;">操作</th>
+                    </tr></thead>
+                    <template x-for="row in realPendingRows()" :key="'rp-' + row.code">
+                        <tbody>
+                            <tr>
+                                <td><code x-text="row.code"></code></td>
+                                <td class="text-xs text-gray-600 truncate" x-text="row.name || '一'"></td>
+                                <td class="text-xs font-mono text-right"
+                                    x-text="realPendingQuotes[row.code] ? realPendingQuotes[row.code].high.toFixed(2) : '一'"></td>
+                                <td class="text-xs font-mono text-right"
+                                    x-text="realPendingQuotes[row.code] ? realPendingQuotes[row.code].close.toFixed(2) : '一'"></td>
+                                <td class="text-right">
+                                    <template x-if="realPendingQuotes[row.code]">
+                                        <span class="text-xs font-mono"
+                                              :class="realPendingQuotes[row.code].change_amt >= 0 ? 'text-red-600' : 'text-green-600'"
+                                              x-text="(realPendingQuotes[row.code].change_amt >= 0 ? '+' : '') + realPendingQuotes[row.code].change_amt.toFixed(2)"></span>
+                                    </template>
+                                    <template x-if="!realPendingQuotes[row.code]">
+                                        <span class="text-xs text-gray-400">一</span>
+                                    </template>
+                                </td>
+                                <td class="text-right">
+                                    <template x-if="realPendingQuotes[row.code]">
+                                        <span class="text-xs font-mono"
+                                              :class="realPendingQuotes[row.code].change_pct >= 0 ? 'text-red-600' : 'text-green-600'"
+                                              x-text="(realPendingQuotes[row.code].change_pct >= 0 ? '+' : '') + realPendingQuotes[row.code].change_pct.toFixed(2) + '%'"></span>
+                                    </template>
+                                    <template x-if="!realPendingQuotes[row.code]">
+                                        <span class="text-xs text-gray-400">一</span>
+                                    </template>
+                                </td>
+                                <td>
+                                    <!-- plan 模式: 可点击切换展开/收起计划摘要 -->
+                                    <template x-if="isPlanMode(row.code)">
+                                        <div class="flex flex-col gap-1">
+                                            <!-- 计划已生效: 实心按钮, 点击展开摘要 -->
+                                            <button type="button"
+                                                    x-show="planActive(normCode(row.code))"
+                                                    class="btn btn-plan btn-xs w-full justify-center"
+                                                    style="padding:2px 8px;font-size:11px;"
+                                                    @click="togglePlanExpand(normCode(row.code))"
+                                                    title="点击展开计划摘要, 再次点击收起">
+                                                交易计划
+                                            </button>
+                                            <!-- 有计划但未生效: 待确认按钮, 点击去交易计划页勾选「生效」 -->
+                                            <a :href="'/trade-plan/' + normCode(row.code) + '?plan_type=' + (viewMode === 'real' ? 'live' : viewMode)"
+                                               x-show="hasPlan(normCode(row.code)) && !planActive(normCode(row.code))"
+                                               class="btn btn-warning btn-xs w-full justify-center inline-flex items-center"
+                                               style="padding:2px 8px;font-size:11px;"
+                                               title="计划未生效, 点击到详情页勾选「生效」后引擎才会执行">
+                                                待确认
+                                            </a>
+                                            <!-- 无实际交易计划: 蓝色实心按钮, 点击去交易计划页生成 -->
+                                            <a :href="'/trade-plan/' + normCode(row.code) + '?plan_type=' + (viewMode === 'real' ? 'live' : viewMode)"
+                                               x-show="!hasPlan(normCode(row.code))"
+                                               class="btn btn-plan btn-xs w-full justify-center inline-flex items-center"
+                                               style="padding:2px 8px;font-size:11px;"
+                                               title="暂无交易计划, 点击生成">
+                                                + 交易计划
+                                            </a>
+                                        </div>
+                                    </template>
+                                    <!-- strategy 模式: 可点击切换策略 -->
+                                    <template x-if="isStrategyMode(row.code)">
+                                        <button type="button"
+                                                class="btn btn-strategy btn-xs w-full justify-center text-left"
+                                                style="padding:2px 8px;font-size:11px;"
+                                                @click="openPositionStrategyModal(row.code)"
+                                                :title="'策略 id: ' + resolvedExecStrategy(row.code) + ' (点击查看说明 / 切换)'"
+                                                x-text="resolvedExecStrategyLabel(row.code)"></button>
+                                    </template>
+                                    <!-- 无模式: 分体入口 -->
+                                    <template x-if="!isPlanMode(row.code) && !isStrategyMode(row.code)">
+                                        <div class="flex items-center gap-1">
+                                            <button type="button"
+                                                    class="btn btn-strategy btn-xs"
+                                                    style="padding:2px 8px;font-size:11px;"
+                                                    @click="openPositionStrategyModal(row.code)">选择策略</button>
+                                            <span class="text-gray-300">|</span>
+                                            <a :href="'/trade-plan/' + normCode(row.code) + '?plan_type=' + (viewMode === 'real' ? 'live' : viewMode)"
+                                               class="btn btn-plan btn-xs inline-flex items-center"
+                                               style="padding:2px 8px;font-size:11px;"
+                                               title="创建交易计划">+ 交易计划</a>
+                                        </div>
+                                    </template>
+                                </td>
+                                <td>
+                                    <button type="button"
+                                            class="btn btn-secondary btn-xs"
+                                            style="padding:2px 8px;font-size:11px;"
+                                            @click="cancelRealEntry(row.code)"
+                                            title="取消该股待入场, 退回实盘自选池">取消</button>
+                                </td>
+                            </tr>
+                            <!-- 交易计划展开卡片 -->
+                            <tr x-show="expandedPlan === normCode(row.code)" x-cloak
+                                class="bg-gray-50/70">
+                                <td colspan="8" class="py-3 px-3" style="overflow:visible;">
+                                    <div class="flex items-start justify-between gap-3 mb-2" style="max-width:100%;">
+                                        <div class="flex flex-col gap-1">
+                                            <div class="flex items-center gap-2 text-xs">
+                                                <span class="font-semibold text-gray-800">交易计划</span>
+                                                <span class="badge text-[10px]"
+                                                      :class="(planIndex[normCode(row.code)]||{}).is_active ? 'badge-success' : 'badge-warning'"
+                                                      :title="(planIndex[normCode(row.code)]||{}).is_active ? '已生效：引擎会自动按条件下单' : '计划未生效：点击「待确认」到详情页勾选「生效」'"
+                                                      x-text="(planIndex[normCode(row.code)]||{}).is_active ? '生效' : '待确认'"></span>
+                                                <span class="text-gray-500">目标仓位 <span class="font-mono"
+                                                      x-text="(((planIndex[normCode(row.code)]||{}).target_ratio_min || 0) * 100).toFixed(0) + '% - ' + (((planIndex[normCode(row.code)]||{}).target_ratio_max || 0) * 100).toFixed(0) + '%'"></span></span>
+                                            </div>
+                                            <div class="text-[10px] text-gray-400"
+                                                 x-text="(planIndex[normCode(row.code)]||{}).is_active
+                                                     ? '已生效：引擎会按条件自动下单'
+                                                     : '计划未生效：需先到详情页勾选「生效」'"></div>
+                                        </div>
+                                        <a :href="'/trade-plan/' + normCode(row.code) + '?plan_type=' + (viewMode === 'real' ? 'live' : viewMode)"
+                                           class="btn btn-plan btn-xs shrink-0"
+                                           style="padding:2px 10px;font-size:11px;">查看/编辑</a>
+                                    </div>
+                                    <template x-if="planDetailCache[normCode(row.code)]">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0" style="max-width:100%;">
+                                            <!-- 入场 -->
+                                            <div x-show="(planDetailCache[normCode(row.code)].entry_conditions || []).length > 0">
+                                                <div class="flex items-center gap-1.5 mb-1.5">
+                                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                    <span class="text-xs font-medium text-blue-700">入场 (<span x-text="(planDetailCache[normCode(row.code)].entry_conditions || []).length"></span>)</span>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <template x-for="(cond, idx) in planDetailCache[normCode(row.code)].entry_conditions" :key="idx">
+                                                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-2 text-xs">
+                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                <div class="font-medium text-blue-900"
+                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                <div class="text-blue-700 shrink-0 font-medium"
+                                                                     x-text="conditionDistanceText(cond, row.last_price || row.close)"></div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <!-- 止盈 -->
+                                            <div x-show="(planDetailCache[normCode(row.code)].exit_plan?.take_profit || []).length > 0">
+                                                <div class="flex items-center gap-1.5 mb-1.5">
+                                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                                    <span class="text-xs font-medium text-green-700">止盈 (<span x-text="(planDetailCache[normCode(row.code)].exit_plan?.take_profit || []).length"></span>)</span>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <template x-for="(cond, idx) in planDetailCache[normCode(row.code)].exit_plan.take_profit" :key="idx">
+                                                        <div class="bg-green-50 border border-green-100 rounded-lg p-2 text-xs">
+                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                <div class="font-medium text-green-900"
+                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                <div class="text-green-700 shrink-0 font-medium"
+                                                                     x-text="conditionDistanceText(cond, row.last_price || row.close)"></div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <!-- 止损 -->
+                                            <div x-show="(planDetailCache[normCode(row.code)].exit_plan?.stop_loss || []).length > 0">
+                                                <div class="flex items-center gap-1.5 mb-1.5">
+                                                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                                    <span class="text-xs font-medium text-red-700">止损 (<span x-text="(planDetailCache[normCode(row.code)].exit_plan?.stop_loss || []).length"></span>)</span>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <template x-for="(cond, idx) in planDetailCache[normCode(row.code)].exit_plan.stop_loss" :key="idx">
+                                                        <div class="bg-red-50 border border-red-100 rounded-lg p-2 text-xs">
+                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                <div class="font-medium text-red-900"
+                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                <div class="text-red-700 shrink-0 font-medium"
+                                                                     x-text="conditionDistanceText(cond, row.last_price || row.close)"></div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <!-- 加仓 -->
+                                            <div x-show="(planDetailCache[normCode(row.code)].add_position_conditions || []).length > 0" class="md:col-span-2">
+                                                <div class="flex items-center gap-1.5 mb-1.5">
+                                                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                                    <span class="text-xs font-medium text-indigo-700">加仓 (<span x-text="(planDetailCache[normCode(row.code)].add_position_conditions || []).length"></span>)</span>
+                                                </div>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    <template x-for="(cond, idx) in planDetailCache[normCode(row.code)].add_position_conditions" :key="idx">
+                                                        <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-2 text-xs">
+                                                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                                                <div class="font-medium text-indigo-900"
+                                                                     x-text="cond.title + ' → ' + conditionActionPrice(cond)"></div>
+                                                                <div class="text-indigo-700 shrink-0 font-medium"
+                                                                     x-text="conditionDistanceText(cond, row.last_price || row.close)"></div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!planDetailCache[normCode(row.code)]">
+                                        <div class="text-xs text-gray-400 py-2 text-center">加载中...</div>
+                                    </template>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </template>
+                </table>
+                </div>
+            </div>
+
+            <!-- 实盘自选池: 表格展示, 支持添加/删除/加策略/加交易计划 -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">实盘自选池</div>
+                        <div class="text-xs text-gray-500 font-normal mt-0.5">
+                            候选股票; 加策略或交易计划后自动进入「待入场」
+                            · <span x-text="realMergedList.length + ' 只监控'"></span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                                style="padding:3px 10px;font-size:11px;"
+                                @click="realWatchBatchMode = !realWatchBatchMode"
+                                x-text="realWatchBatchMode ? '收起' : '批量'">批量</button>
+                        <button type="button" class="btn btn-primary btn-sm"
+                                style="padding:3px 10px;font-size:11px;"
+                                @click="realWatchAddMode = true">+ 添加</button>
+                    </div>
+                </div>
+
+                <!-- 批量编辑模式 -->
+                <div x-show="realWatchBatchMode" class="mb-3">
+                    <textarea class="form-textarea w-full text-sm font-mono"
+                              style="min-height:80px;"
+                              x-model="realWatchPoolText"
+                              placeholder="例如: 600519.SH,688981.SH,688256.SH"></textarea>
+                    <div class="flex justify-end gap-2 mt-2">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                                style="padding:3px 10px;font-size:11px;"
+                                @click="loadRealWatchPool()">重置</button>
+                        <button type="button" class="btn btn-primary btn-sm"
+                                style="padding:3px 10px;font-size:11px;"
+                                @click="saveRealWatchPool()">保存</button>
+                    </div>
+                </div>
+
+                <!-- 快速添加行 -->
+                <div x-show="realWatchAddMode" class="flex items-center gap-2 mb-3"
+                     @keydown.enter.prevent="confirmRealWatchAdd()">
+                    <input type="text" class="form-input flex-1 text-sm"
+                           style="padding:5px 8px;font-size:12px;"
+                           x-model="realWatchAddCode"
+                           placeholder="输入股票代码, 如 600519.SH">
+                    <button type="button" class="btn btn-primary btn-sm"
+                            style="padding:3px 10px;font-size:11px;"
+                            @click="confirmRealWatchAdd()">确认</button>
+                    <button type="button" class="btn btn-secondary btn-sm"
+                            style="padding:3px 10px;font-size:11px;"
+                            @click="realWatchAddMode = false; realWatchAddCode = ''">取消</button>
+                </div>
+
+                <!-- 自选池表格 -->
+                <template x-if="realWatchListItems().length === 0">
+                    <div class="text-gray-400 text-sm py-5 text-center">
+                        (暂无自选候选 -- 点击「+ 添加」加入监控池)
+                    </div>
+                </template>
+                <template x-if="realWatchListItems().length > 0">
+                    <div class="overflow-x-auto">
+                        <table class="app-table" style="table-layout:fixed;width:100%;">
+                            <thead>
+                                <tr>
+                                    <th style="width:110px;">代码</th>
+                                    <th style="width:110px;">名称</th>
+                                    <th style="width:70px;" class="text-right">最高价</th>
+                                    <th style="width:70px;" class="text-right">最新价</th>
+                                    <th style="width:65px;" class="text-right">涨跌额</th>
+                                    <th style="width:70px;" class="text-right">涨跌幅</th>
+                                    <th style="width:130px;">操作</th>
+                                    <th style="width:40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in realWatchListItems()" :key="'rw-' + item.code">
+                                    <tr>
+                                        <td><code x-text="item.code"></code></td>
+                                        <td class="text-xs text-gray-600 truncate"
+                                            x-text="item.name || '一'"></td>
+                                        <td class="text-xs font-mono text-right"
+                                            x-text="item.quote ? item.quote.high.toFixed(2) : '一'"></td>
+                                        <td class="text-xs font-mono text-right"
+                                            x-text="item.quote ? item.quote.close.toFixed(2) : '一'"></td>
+                                        <td class="text-right">
+                                            <template x-if="item.quote">
+                                                <span class="text-xs font-mono"
+                                                      :class="item.quote.change_amt >= 0 ? 'text-red-600' : 'text-green-600'"
+                                                      x-text="(item.quote.change_amt >= 0 ? '+' : '') + item.quote.change_amt.toFixed(2)"></span>
+                                            </template>
+                                            <template x-if="!item.quote">
+                                                <span class="text-xs text-gray-400">一</span>
+                                            </template>
+                                        </td>
+                                        <td class="text-right">
+                                            <template x-if="item.quote">
+                                                <span class="text-xs font-mono"
+                                                      :class="item.quote.change_pct >= 0 ? 'text-red-600' : 'text-green-600'"
+                                                      x-text="(item.quote.change_pct >= 0 ? '+' : '') + item.quote.change_pct.toFixed(2) + '%'"></span>
+                                            </template>
+                                            <template x-if="!item.quote">
+                                                <span class="text-xs text-gray-400">一</span>
+                                            </template>
+                                        </td>
+                                        <td>
+                                            <div class="flex items-center gap-1.5">
+                                                <button type="button"
+                                                        class="btn btn-strategy btn-xs"
+                                                        style="padding:2px 8px;font-size:11px;"
+                                                        @click="bindStrategyForRealWatch(item.code)">选择策略</button>
+                                                <button type="button"
+                                                        class="btn btn-plan btn-xs"
+                                                        style="padding:2px 8px;font-size:11px;"
+                                                        @click="addPlanForRealWatch(item.code)">+ 交易计划</button>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button"
+                                                    class="text-gray-400 hover:text-red-600 text-base leading-none"
+                                                    style="line-height:1;"
+                                                    @click="removeFromRealWatchList(item.code)"
+                                                    title="从实盘自选池删除">x</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+            </div>
+
+
+        <!-- 策略信号表 (引擎实时计算 = realState.signals)
+             实盘视图也需要看引擎判断 -- 上面只放需要授权的 buy/sell;
+             这里展示所有最近策略信号(含历史回放), 用户能验证"为什么没出信号"和"信号已经被处理" -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">策略信号 (引擎实时计算)</div>
+                    <div class="text-xs text-gray-500 font-normal mt-0.5">
+                        引擎每分钟跑一轮, 把最近 30 条 buy / sell 列在这里;
+                        实盘下 buy/sell 同步入上方「待授权」, 模拟盘下会按引擎规则自动撮合.
+                        策略徽章 hover 看触发原因.
+                    </div>
+                </div>
+                <span class="text-xs text-gray-400" x-text="(realState.signals || []).length + ' / 100'"></span>
+            </div>
+            <template x-if="filteredSignals().length === 0">
+                <div class="text-gray-400 text-sm py-3 text-center">(暂无信号 -- 等待盘中策略触发)</div>
+            </template>
+            <template x-if="filteredSignals().length > 0">
+                <div class="overflow-x-auto">
+                <table class="app-table">
+                    <thead><tr>
+                        <th style="width:120px;">时间</th>
+                        <th style="width:110px;">代码</th>
+                        <th style="width:60px;">方向</th>
+                        <th style="width:160px;">策略</th>
+                        <th style="width:70px;">结果</th>
+                        <th style="width:90px;">授权状态</th>
+                        <th>原因</th>
+                    </tr></thead>
+                    <tbody>
+                        <template x-for="(s, i) in filteredSignals()" :key="i">
+                            <tr>
+                                <td class="num text-xs" x-text="App.fmtSignalTs(s.ts)"></td>
+                                <td><code x-text="s.code"></code></td>
+                                <td>
+                                    <span class="badge"
+                                          :class="s.side === 'buy' ? 'badge-success' : 'badge-danger'"
+                                          x-text="s.side"></span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-info"
+                                          style="font-size:10px;"
+                                          :title="(s.reason || '') + ' (' + (s.strategy || '') + ')'"
+                                          x-text="strategyLabel(s.strategy) || '-'"></span>
+                                </td>
+                                <td>
+                                    <span class="badge"
+                                          :class="s.order_status === 'dry_run' || s.order_status === 'submitted' ? 'badge-success' : 'badge-warning'"
+                                          :title="s.order_reason || ''"
+                                          x-text="orderStatusLabel(s.order_status)"></span>
+                                </td>
+                                <td>
+                                    <span class="text-xs"
+                                          :class="signalApprovalBadgeCls(s)"
+                                          x-text="signalApprovalText(s)"></span>
+                                </td>
+                                <td class="text-xs text-gray-600"
+                                    style="max-width:360px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                                    :title="s.reason || ''"
+                                    x-text="s.reason || '-'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                </div>
+            </template>
+            <p class="text-xs text-gray-400 mt-2 mb-0 leading-relaxed">
+                想看「资金曲线」? miniQMT 没提供历史净值 API, 实盘曲线无法回放; 模拟盘的曲线在
+                <a href="/live/sim" class="text-indigo-600 hover:underline">/live/sim</a> 「资金曲线」(基于 mock 持仓 + 同款策略, 仅作参考).
+            </p>
+        </div>
+
+            </div>
+            <div class="flex-col">
+            <!-- 实盘引擎控制 -->
+            <div class="card">
+                <div class="card-header" style="padding-bottom:0.6rem;">
+                    <div class="flex items-center gap-2">
+                        <div class="card-title">实盘引擎控制</div>
+                        <span class="badge text-xs"
+                              :class="real.running ? 'badge-success' : 'badge-gray'"
+                              x-text="real.running ? 'RUNNING' : 'STOPPED'"></span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" x-show="real.running"
+                                class="btn btn-secondary"
+                                style="padding:2px 10px;font-size:11px;line-height:1.3;"
+                                @click="realStop()" title="停止实盘引擎">停止</button>
+                        <button type="button" x-show="!real.running"
+                                class="btn btn-primary"
+                                style="padding:2px 10px;font-size:11px;line-height:1.3;"
+                                @click="realStart()" title="启动实盘引擎 (信号需手动授权)">启动</button>
+                    </div>
+                </div>
+
+                <!-- 引擎状态行: 监控数 / 已跑轮数 / 上次循环 -->
+                <div class="text-xs text-gray-600 pt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>监控 <b class="text-gray-900" x-text="(realMergedList || []).length"></b> 只</span>
+                    <span x-show="real.cycle_count > 0">-
+                        已跑 <b class="text-gray-900" x-text="real.cycle_count"></b> 轮
+                    </span>
+                    <span x-show="real.last_cycle_at" class="text-gray-400 font-mono"
+                          x-text="'- ' + (real.last_cycle_at || '')"></span>
+                </div>
+
+                <!-- 已停止时提示 -->
+                <div x-show="!real.running" class="mt-2 text-xs">
+                    <span class="text-amber-700">引擎已停止</span>
+                </div>
+
+                <div class="text-xs text-red-600 mt-1.5" x-show="real.last_error"
+                     x-text="'报错: ' + real.last_error"></div>
+
+                <!-- 工具链接行: 试算 / 清空历史 -->
+                <div class="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+                    <div class="flex gap-3">
+                        <button type="button" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+                                @click="realTrialRunNow()"
+                                :disabled="realTrialBusy"
+                                x-text="realTrialBusy ? '试算中...' : '试算'"></button>
+                        <button type="button" class="text-gray-600 hover:text-indigo-700 hover:underline"
+                                @click="realClearHistory()" title="清掉实盘信号/订单/事件 (不影响真实 miniQMT 持仓)">清空历史</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI 信号 → 手动授权 下单 -->
+            <div class="card">
+
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">AI 信号 → 手动授权</div>
+                        <div class="card-subtitle">引擎出 buy / sell, 点「授权」才真走 miniQMT (5 分钟过期)</div>
+                    </div>
+                    <button class="btn btn-secondary btn-xs" @click="refreshApprovals(true)">刷新</button>
+                </div>
+
+                <!-- 待授权列表 -->
+                <template x-if="pendingApprovals().length === 0">
+                    <div class="text-gray-400 text-sm py-4 text-center border border-dashed border-gray-200 rounded">
+                        暂无待授权信号<br/>
+                        <span class="text-xs">引擎每分钟跑一轮, buy / sell 会自动出现在这里</span>
+                    </div>
+                </template>
+                <div class="space-y-2">
+                    <template x-for="it in pendingApprovals()" :key="it.id">
+                        <div class="border rounded p-3"
+                             :class="it.side === 'buy' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'">
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="badge"
+                                              :class="it.side === 'buy' ? 'badge-danger' : 'badge-success'"
+                                              x-text="it.side === 'buy' ? '买入' : '卖出'"></span>
+                                        <code class="text-sm font-bold" x-text="it.code"></code>
+                                        <span class="text-xs text-gray-500" x-text="strategyLabel(it.strategy)"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-600 mt-1">
+                                        建议 <b x-text="it.suggested_quantity + ' 股'"></b>
+                                        @ <span x-text="it.suggested_price > 0 ? it.suggested_price.toFixed(2) : '市价'"></span>
+                                        <span class="text-gray-400" x-show="it.reason"> · <span x-text="it.reason"></span></span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        信号时间 <span x-text="it.ts"></span>
+                                        · <span x-text="Math.round(it.age_sec) + ' 秒前'"></span>
+                                        · 剩 <span x-text="Math.max(0, Math.round(300 - it.age_sec)) + ' 秒'"></span> 过期
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-success btn-xs flex-1"
+                                        @click="approveSignal(it)"
+                                        :disabled="approvalBusyId === it.id || it.eligible === false"
+                                        :title="it.eligible === false ? it.eligible_reason : '授权后真走 miniQMT 下单'"
+                                        x-text="approvalBusyId === it.id ? '下单中...'
+                                              : (it.eligible === false ? '不可下单' : '授权下单')"></button>
+                                <button class="btn btn-secondary btn-xs"
+                                        @click="rejectSignal(it)"
+                                        :disabled="approvalBusyId === it.id">拒绝</button>
+                            </div>
+                            <div class="text-xs text-red-700 mt-1" x-show="it.eligible === false"
+                                 x-text="'⚠ ' + it.eligible_reason"></div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- 已处理历史 (折叠) -->
+                <details class="mt-3" x-show="processedApprovals().length > 0">
+                    <summary class="cursor-pointer text-xs text-gray-600 select-none py-1">
+                        已处理 <span x-text="processedApprovals().length"></span> 条 (点开)
+                    </summary>
+                    <div class="space-y-1 mt-2">
+                        <template x-for="it in processedApprovals()" :key="it.id">
+                            <div class="text-xs flex items-center gap-2 py-1 border-b border-gray-100 last:border-0">
+                                <span class="badge"
+                                      :class="it.status === 'approved' ? 'badge-success'
+                                            : it.status === 'rejected' ? 'badge-secondary'
+                                            : 'badge-warning'"
+                                      x-text="it.status === 'approved' ? '已下单'
+                                            : it.status === 'rejected' ? '已拒绝' : '已过期'"></span>
+                                <code x-text="it.code"></code>
+                                <span :class="it.side === 'buy' ? 'text-red-600' : 'text-green-600'"
+                                      x-text="it.side === 'buy' ? '买' : '卖'"></span>
+                                <span class="text-gray-500" x-text="it.suggested_quantity + ' 股'"></span>
+                                <span class="text-gray-400 ml-auto" x-text="it.processed_ts || it.ts"></span>
+                                <span class="text-red-600" x-show="it.error" x-text="it.error"></span>
+                                <span class="text-gray-500" x-show="it.order && it.order.order_id"
+                                      x-text="'#' + it.order.order_id"></span>
+                            </div>
+                        </template>
+                    </div>
+                </details>
+
+                <!-- 引导提示压缩成一行小字, 减少视觉噪音 -->
+                <div class="mt-2 text-xs text-gray-400 leading-relaxed">
+                    只有 <b>已绑策略</b> 的票才会出 buy / sell. hold / 错误等完整流见下方「策略信号」表.
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+    <!-- ======== 实盘视图 END ======== -->
+    <!-- 实盘持仓 已合并进上方"实盘账户"卡的 sub-section, 此处不再单独立卡 -->

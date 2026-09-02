@@ -12,7 +12,7 @@
 - 政策事件：降准降息、产业政策、监管新规
 
 用法：
-    python event_detector.py --news_file data/002594_news.json --output_dir output/
+    python event_detector.py --news_file data/002594_news.json --output_dir outputs/news/
 """
 
 import argparse
@@ -176,7 +176,7 @@ def extract_news_text(news_item: dict) -> str:
 def main():
     parser = argparse.ArgumentParser(description="事件识别与交易信号生成器")
     parser.add_argument("--news_file", required=True, help="新闻 JSON 文件路径")
-    parser.add_argument("--output_dir", default="./output", help="输出目录")
+    parser.add_argument("--output_dir", default="./outputs/news", help="输出目录")
     parser.add_argument("--model", default="qwen-turbo", help="LLM 模型")
     parser.add_argument("--use_llm", action="store_true", help="使用 LLM 进行精细事件识别（较慢但更准确）")
     args = parser.parse_args()

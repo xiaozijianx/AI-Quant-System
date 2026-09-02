@@ -1,0 +1,21 @@
+{
+  "overall_sentiment": "乐观",
+  "fear_greed_index": 75,
+  "positive_count": 6,
+  "negative_count": 0,
+  "neutral_count": 3,
+  "top_themes": [
+    "华测检测业绩表现",
+    "外资持股情况",
+    "分红政策"
+  ],
+  "risk_alerts": [
+    "部分机构减持可能影响市场信心",
+    "外资持股比例高可能带来波动风险"
+  ],
+  "opportunity_hints": [
+    "关注华测检测的持续增长潜力",
+    "留意外资动向和市场反应"
+  ],
+  "summary": "整体市场情绪乐观，华测检测业绩强劲，正面新闻占主导。"
+}

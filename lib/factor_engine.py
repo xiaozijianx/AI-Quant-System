@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable
 import numpy as np
 import pandas as pd
+import torch
 
 # ML 模型落盘目录 (因子包复用: 其他页面加载模型直接预测, 无需重训)
 ML_MODEL_DIR = Path(__file__).resolve().parent.parent / "data" / "factor_packages" / "models"
@@ -179,6 +180,30 @@ def cs_TransNorm(df: pd.DataFrame) -> pd.DataFrame:
     return ranked.map(lambda x: norm.ppf(x) if pd.notna(x) else np.nan)
 
 
+def cs_Scale(df: pd.DataFrame) -> pd.DataFrame:
+    """截面绝对和归一: 每行除以该行 |x| 之和 (对齐 QuantGP 原版 t_cs_scale)"""
+    denom = df.abs().sum(axis=1).replace(0, np.nan)
+    return df.div(denom, axis=0)
+
+
+def cs_MinMaxScale(df: pd.DataFrame) -> pd.DataFrame:
+    """截面 min-max 缩放到 [0,1] (对齐 AlphaMaster CS_SCALE; RL 专用, 不改变原 cs_Scale)"""
+    mn = df.min(axis=1)
+    mx = df.max(axis=1)
+    span = mx - mn
+    out = df.sub(mn, axis=0)
+    out = out.div(span.replace(0, np.nan), axis=0)
+    out = out.where(span != 0, 0.5)
+    return out
+
+
+def cs_Winsorize(df: pd.DataFrame) -> pd.DataFrame:
+    """截面分位去极值: 每行裁剪到 [5%, 95%] (对齐 QuantGP 原版 t_cs_winsorize)"""
+    lower = df.quantile(0.05, axis=1)
+    upper = df.quantile(0.95, axis=1)
+    return df.clip(lower=lower, upper=upper, axis=0)
+
+
 # ============================================================
 # 二-bis-bis、时序标准化工具 (technical_ts 类因子评价/合成共用)
 # ============================================================
@@ -232,6 +257,221 @@ def ts_Bias(df: pd.DataFrame, n: int) -> pd.DataFrame:
 def ts_Shift(df: pd.DataFrame, n: int) -> pd.DataFrame:
     """平移n期 (等价于ts_Delay, 兼容不同写法)"""
     return df.shift(n)
+
+
+def ts_ShiftZero(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """左侧补 0 的平移 (与 RL StackVM _ts_delay 一致, 只将前 n 行置 0)"""
+    out = df.shift(n)
+    if n > 0 and len(out) > 0:
+        out.iloc[:n] = 0.0
+    return out
+
+
+def ts_RobustNorm(df: pd.DataFrame, w: int = 200) -> pd.DataFrame:
+    """RL 特征 robust 归一化 (median/MAD, clip ±5, warm-up 期输出 0)
+
+    与 lib/factor_rl/features.py 的 _robust_norm 使用完全相同的 torch 实现,
+    从而保证 RL 训练时的特征值与最终表达式求值结果一致。
+    """
+    if df is None or len(df) == 0:
+        return df.copy()
+    arr = df.to_numpy(dtype=np.float32)
+    T, N = arr.shape
+    w = int(max(1, min(w, T)))
+    x = torch.tensor(arr.T, dtype=torch.float32)  # [N, T]
+    if T <= 1:
+        return pd.DataFrame(np.zeros_like(arr), index=df.index, columns=df.columns)
+    pad = torch.zeros(N, w - 1, dtype=x.dtype, device=x.device)
+    wnd = torch.cat([pad, x], dim=1).unfold(1, w, 1)  # [N, T, w]
+    med = wnd.median(dim=-1).values
+    mad = (wnd - med.unsqueeze(-1)).abs().median(dim=-1).values + 1e-6
+    out = torch.clamp((x - med) / mad, -5.0, 5.0)
+    out = torch.nan_to_num(out, nan=0.0, posinf=5.0, neginf=-5.0)
+    warmup_mask = torch.arange(T, device=x.device) < (w - 1)
+    out[:, warmup_mask] = 0.0
+    return pd.DataFrame(out.numpy().T, index=df.index, columns=df.columns)
+
+
+def ts_OutputNorm(df: pd.DataFrame, w: int = 500) -> pd.DataFrame:
+    """RL StackVM 输出标准化 (与 lib/factor_rl/vm.py _normalize_output 完全一致)
+
+    - N>1: 截面 zscore (每时间步跨股票), clip [-3,3]
+    - N=1: 滚动时序 zscore (窗口 500, 因果), warm-up 期输出 0
+    """
+    if df is None or len(df) == 0:
+        return df.copy()
+    arr = df.to_numpy(dtype=np.float32)
+    T, N = arr.shape
+    x = torch.tensor(arr.T, dtype=torch.float32)  # [N, T]
+    if x.std() < 1e-6:
+        return df.copy()
+    if N > 1:
+        cs_mean = x.mean(dim=0, keepdim=True)
+        cs_std = x.std(dim=0, keepdim=True).clamp_min(1e-8)  # 与原版一致: unbiased=True
+        out = torch.clamp((x - cs_mean) / cs_std, -3.0, 3.0)
+    else:
+        if T < w:
+            cnt = torch.arange(1, T + 1, dtype=x.dtype, device=x.device).view(1, T)
+            mean = x.cumsum(dim=1) / cnt
+            sq = (x * x).cumsum(dim=1) / cnt
+            var = (sq - mean * mean).clamp_min(0.0)
+            std = var.sqrt().clamp_min(1e-8)
+            out = torch.clamp((x - mean) / std, -3.0, 3.0)
+        else:
+            pad = torch.zeros(N, w - 1, dtype=x.dtype, device=x.device)
+            padded = torch.cat([pad, x], dim=1)
+            windows = padded.unfold(1, w, 1)
+            ts_mean = windows.mean(dim=2)
+            ts_std = windows.std(dim=2).clamp_min(1e-8)  # 与原版一致: unbiased=True
+            out = (x - ts_mean) / ts_std
+            warmup_mask = torch.arange(T, device=x.device) < (w - 1)
+            out[:, warmup_mask] = 0.0
+            out = torch.clamp(out, -3.0, 3.0)
+    return pd.DataFrame(out.numpy().T, index=df.index, columns=df.columns)
+
+
+def _rl_to_tensor(df: pd.DataFrame) -> torch.Tensor:
+    """DataFrame [T,N] -> Tensor [N,T] float32 (与 RL FeatureEngine 一致)"""
+    return torch.tensor(df.to_numpy(dtype=np.float32).T, dtype=torch.float32)
+
+
+def _rl_to_df(x: torch.Tensor, df: pd.DataFrame) -> pd.DataFrame:
+    """Tensor [N,T] -> DataFrame [T,N]"""
+    return pd.DataFrame(x.numpy().T, index=df.index, columns=df.columns)
+
+
+def _rl_unary(df: pd.DataFrame, fn_name: str, *args):
+    """调用 RL StackVM 的一元算子并转回 DataFrame"""
+    from lib.factor_rl import ops as rl_ops
+    fn = getattr(rl_ops, fn_name)
+    return _rl_to_df(fn(_rl_to_tensor(df), *args), df)
+
+
+def ts_RLMean(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_mean", n)
+
+
+def ts_RLStdev(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_std", n)
+
+
+def ts_RLSum(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_sum", n)
+
+
+def ts_RLMax(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_max", n)
+
+
+def ts_RLMin(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_min", n)
+
+
+def ts_RLRank(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_rank", n)
+
+
+def ts_RLQuantile(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_quantile", n)
+
+
+def ts_RLZscore(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_zscore", n)
+
+
+def ts_RLSkew(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_skew", n)
+
+
+def ts_RLArgMax(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_argmax", n)
+
+
+def ts_RLArgMin(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_argmin", n)
+
+
+def ts_RLProduct(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_product", n)
+
+
+def ts_RLDecayLinear(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_decay_linear", n)
+
+
+def ts_RLDecayExp(df: pd.DataFrame, n: int, alpha: float = 0.5) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_decay_exp", n, alpha)
+
+
+def ts_RLScale(df: pd.DataFrame) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_scale")
+
+
+def ts_RLLog(df: pd.DataFrame) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_log")
+
+
+def ts_RLDelta(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ts_delta", n)
+
+
+def ts_RLWMA(df: pd.DataFrame) -> pd.DataFrame:
+    return _rl_unary(df, "_op_wma")
+
+
+def ts_RLEMA(df: pd.DataFrame, span: int) -> pd.DataFrame:
+    return _rl_unary(df, "_ema_simple", span)
+
+
+def ts_RLJump(df: pd.DataFrame) -> pd.DataFrame:
+    return _rl_unary(df, "op_jump")
+
+
+def ts_RLCorr(df1: pd.DataFrame, df2: pd.DataFrame, n: int) -> pd.DataFrame:
+    from lib.factor_rl import ops as rl_ops
+    return _rl_to_df(rl_ops._ts_corr(_rl_to_tensor(df1), _rl_to_tensor(df2), n), df1)
+
+
+def ts_RLCov(df1: pd.DataFrame, df2: pd.DataFrame, n: int) -> pd.DataFrame:
+    from lib.factor_rl import ops as rl_ops
+    return _rl_to_df(rl_ops._ts_covariance(_rl_to_tensor(df1), _rl_to_tensor(df2), n), df1)
+
+
+def cs_RankRL(df: pd.DataFrame) -> pd.DataFrame:
+    from lib.factor_rl import ops as rl_ops
+    return _rl_to_df(rl_ops.op_cs_rank(_rl_to_tensor(df)), df)
+
+
+def cs_ZscoreRL(df: pd.DataFrame) -> pd.DataFrame:
+    from lib.factor_rl import ops as rl_ops
+    return _rl_to_df(rl_ops.op_cs_zscore(_rl_to_tensor(df)), df)
+
+
+def cs_TransNormRL(df: pd.DataFrame) -> pd.DataFrame:
+    from lib.factor_rl import ops as rl_ops
+    return _rl_to_df(rl_ops.op_cs_transnorm(_rl_to_tensor(df)), df)
+
+
+def ts_Winsorize(df: pd.DataFrame, w: int = 20, lo: float = 0.05, hi: float = 0.95) -> pd.DataFrame:
+    """时序滚动分位裁剪 (对齐 AlphaMaster WINSORIZE, 与 RL StackVM 一致)"""
+    if df is None or len(df) == 0:
+        return df.copy()
+    arr = df.to_numpy(dtype=np.float32)
+    T, N = arr.shape
+    w = int(max(1, min(w, T)))
+    if T <= 1:
+        return df.copy()
+    x = torch.tensor(arr.T, dtype=torch.float32)  # [N, T]
+    pad = torch.zeros(N, w - 1, dtype=x.dtype, device=x.device)
+    wnd = torch.cat([pad, x], dim=1).unfold(1, w, 1).float()  # [N, T, w]
+    lower = torch.quantile(wnd, lo, dim=-1).to(x.dtype)
+    upper = torch.quantile(wnd, hi, dim=-1).to(x.dtype)
+    span = upper - lower
+    safe_lower = torch.where(span < 1e-9, x, lower)
+    safe_upper = torch.where(span < 1e-9, x, upper)
+    out = torch.clamp(x, safe_lower, safe_upper)
+    out = torch.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
+    return pd.DataFrame(out.numpy().T, index=df.index, columns=df.columns)
 
 
 def ts_CumReturn(df: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -737,6 +977,129 @@ def ts_Identity(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ============================================================
+# QuantGP 复刻缺失算子补充 (对应原版 GPU_SAFE_PANEL_FUNCTIONS)
+# 语义对齐 third_party/QuantGplearn/QuantGplearn/torch_functions.py 的同名算子,
+# 实现风格与本系统既有 ts_* 算子完全一致 (DataFrame(index=日期, columns=股票) + rolling + min_periods 预热);
+# 均为纯算子, 不进入 BASE_OPERATOR_MAP, 不新增基类记录与 factor_type 分类。
+# ============================================================
+
+def ts_ZScore(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期滚动Z-score标准化 = (x - MA) / STD (对应原版 ts_zscore)"""
+    mean = df.rolling(n, min_periods=1).mean()
+    std = df.rolling(n, min_periods=2).std().replace(0, np.nan)
+    return df.sub(mean).div(std)
+
+
+def ts_Freq(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期窗口内与当前值相等的个数 (对应原版 ts_freq)"""
+    def _cnt(w):
+        if len(w) == 0 or pd.isna(w[-1]):
+            return np.nan
+        return float(np.sum(w == w[-1]))
+    return df.rolling(n, min_periods=1).apply(_cnt, raw=True)
+
+
+def ts_CDLBodyM(open_df: pd.DataFrame, close_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期阳线占比 = 阳线数 / (阳线+阴线)数 (对应原版 ts_cdlbodym)"""
+    body = close_df - open_df
+    up = (body > 0).astype(float)
+    down = (body < 0).astype(float)
+    num = up.rolling(n, min_periods=1).sum()
+    den = (up + down).rolling(n, min_periods=1).sum().replace(0, np.nan)
+    return num / den
+
+
+def ts_BarBS(high_df: pd.DataFrame, low_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期外扩K线占比: 高点抬升且低点下移的K线 / (外扩+内敛) (对应原版 ts_bar_bs)"""
+    hd = high_df - high_df.shift(1)
+    ld = low_df - low_df.shift(1)
+    big = ((hd > 0) & (ld < 0)).astype(float)
+    small = ((hd < 0) & (ld > 0)).astype(float)
+    num = big.rolling(n, min_periods=1).sum()
+    den = (big + small).rolling(n, min_periods=1).sum().replace(0, np.nan)
+    return num / den
+
+
+def ts_AROON(high_df: pd.DataFrame, low_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期Aroon方向强度 = (最高价位置-最低价位置)/n, 位置为窗口内0起索引 (对应原版 ts_aroon)"""
+    def _pos_hi(w):
+        if len(w) == 0:
+            return np.nan
+        return float(np.argmax(np.where(np.isfinite(w), w, -np.inf)))
+    def _pos_lo(w):
+        if len(w) == 0:
+            return np.nan
+        return float(np.argmin(np.where(np.isfinite(w), w, np.inf)))
+    hp = high_df.rolling(n, min_periods=1).apply(_pos_hi, raw=True)
+    lp = low_df.rolling(n, min_periods=1).apply(_pos_lo, raw=True)
+    return (hp - lp) / float(max(n, 1))
+
+
+def ts_BOPR(open_df: pd.DataFrame, high_df: pd.DataFrame, low_df: pd.DataFrame,
+            close_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期力量平衡均值 = mean((Close-Open)/(High-Low), n) (对应原版 ts_bopr)"""
+    span = (high_df - low_df).replace(0, np.nan)
+    bop = (close_df - open_df) / span
+    return bop.rolling(n, min_periods=1).mean()
+
+
+def ts_OneOlsK(x_df: pd.DataFrame, y_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期一元OLS回归斜率 = (nΣxy-ΣxΣy) / (nΣx²-(Σx)²), n取窗口内有效样本数 (对应原版 ts_one_ols_k)"""
+    sx = x_df.rolling(n, min_periods=1).sum()
+    sy = y_df.rolling(n, min_periods=1).sum()
+    sxy = (x_df * y_df).rolling(n, min_periods=1).sum()
+    sx2 = (x_df * x_df).rolling(n, min_periods=1).sum()
+    cnt = x_df.rolling(n, min_periods=1).count()
+    num = cnt * sxy - sx * sy
+    den = (cnt * sx2 - sx * sx).replace(0, np.nan)
+    return num / den
+
+
+def ts_OneOlsResid(x_df: pd.DataFrame, y_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期一元OLS回归残差 = y - (斜率*x + 截距) (对应原版 ts_one_ols_resid)"""
+    beta = ts_OneOlsK(x_df, y_df, n)
+    intercept = y_df.rolling(n, min_periods=1).mean() - beta * x_df.rolling(n, min_periods=1).mean()
+    return y_df - (beta * x_df + intercept)
+
+
+def ts_STOCHF(high_df: pd.DataFrame, low_df: pd.DataFrame, close_df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期快速随机指标 = (Close-min(Low,n)) / (max(High,n)-min(Low,n)) (对应原版 ts_stochf)"""
+    low_min = low_df.rolling(n, min_periods=1).min()
+    high_max = high_df.rolling(n, min_periods=1).max()
+    span = (high_max - low_min).replace(0, np.nan)
+    return (close_df - low_min) / span
+
+
+def ts_CMO(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期钱德动量振荡 CMO = (Σ涨-Σ跌)/(Σ涨+Σ跌) (对应原版 ts_cmo)"""
+    diff = df.diff()
+    su = diff.clip(lower=0).rolling(n, min_periods=1).sum()
+    sd = (-diff).clip(lower=0).rolling(n, min_periods=1).sum()
+    return (su - sd) / (su + sd).replace(0, np.nan)
+
+
+def ts_XSRatio(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """n期效率比 = |x[t]-x[t-n]| / Σ|x[t]-x[t-1]| (对应原版 ts_xs_ratio)"""
+    directional = (df - df.shift(n)).abs()
+    volatility = df.diff().abs().rolling(n, min_periods=1).sum()
+    return directional / volatility.replace(0, np.nan)
+
+
+def ts_Hedge(x_df: pd.DataFrame, y_df: pd.DataFrame, n: int, n_zscore: int) -> pd.DataFrame:
+    """n期回归残差对冲Z-score = Z( x - beta*y, n_zscore ), beta=OLS(y~x) (对应原版 ts_hedge)"""
+    beta = ts_OneOlsK(y_df, x_df, n)
+    resid = x_df - beta * y_df
+    return ts_ZScore(resid, n_zscore)
+
+
+def ts_BOLL(df: pd.DataFrame, n: int, mult: float) -> pd.DataFrame:
+    """n期布林带上轨 = MA(n) + mult*STD(n) (对应原版 ts_bband, mult为常数参数)"""
+    mean = df.rolling(n, min_periods=1).mean()
+    std = df.rolling(n, min_periods=2).std()
+    return mean + float(mult) * std
+
+
+# ============================================================
 # AlphaMaster 映射补充算子 (见 AlphaMaster特征算子与因子库映射方案.md 3.1)
 # 语义复刻 AlphaMaster ops.py, 适配本系统 DataFrame 面板 (index=日期, columns=股票代码)
 # ============================================================
@@ -813,6 +1176,16 @@ def sqrt(df: pd.DataFrame) -> pd.DataFrame:
     return np.sign(df) * np.sqrt(np.abs(df))
 
 
+def log(df: pd.DataFrame) -> pd.DataFrame:
+    """自然对数 (元素级, 对齐 QuantGP 原版 t_log: |x|<=1e-6 置 0, 负值取绝对值后求对数,
+    避免对 0/负值求 log 产生 invalid 警告与 NaN 扩散)"""
+    EPS = 1e-6
+    x = np.abs(df)
+    out = np.where(x > EPS, np.log(x), 0.0)
+    out = np.where(np.isfinite(out), out, 0.0)
+    return pd.DataFrame(out, index=df.index, columns=df.columns)
+
+
 def clip(df: pd.DataFrame, lo: float = -3.0, hi: float = 3.0) -> pd.DataFrame:
     """固定裁剪"""
     return df.clip(lo, hi)
@@ -821,6 +1194,13 @@ def clip(df: pd.DataFrame, lo: float = -3.0, hi: float = 3.0) -> pd.DataFrame:
 def sigmoid(df: pd.DataFrame) -> pd.DataFrame:
     """sigmoid压缩到(0,1)"""
     return 1.0 / (1.0 + np.exp(-df))
+
+
+def sigmoid_squash(df: pd.DataFrame) -> pd.DataFrame:
+    """AlphaMaster SIGMOID: 2*sigmoid(x)-1, 输出 [-1,1]"""
+    out = 2.0 / (1.0 + np.exp(-df)) - 1.0
+    return pd.DataFrame(np.nan_to_num(out, nan=0.0, posinf=1.0, neginf=-1.0),
+                        index=df.index, columns=df.columns)
 
 
 def tanh_squash(df: pd.DataFrame) -> pd.DataFrame:
@@ -4951,11 +5331,13 @@ def run_single_ic_timeseries(factor_series: pd.Series,
 _SAFE_FUNCTIONS = {
     # 原有cs_*截面算子
     "cs_Rank", "cs_Mean", "cs_Demean", "cs_Zscore", "cs_TransNorm",
+    "cs_Scale", "cs_MinMaxScale", "cs_Winsorize",
+    "cs_RankRL", "cs_ZscoreRL", "cs_TransNormRL",
     # 新增财务数据引用
     "FN", "fin_Delay",
     # AlphaMaster 映射补充算子 (非 ts_* 前缀, 需手动登记, 见 AlphaMaster特征算子与因子库映射方案.md 3.1)
-    "sign", "gate", "jump", "max3", "power", "signed_log", "sqrt",
-    "clip", "sigmoid", "tanh_squash", "if_gt", "winsorize",
+    "sign", "gate", "jump", "max3", "power", "signed_log", "sqrt", "log",
+    "clip", "sigmoid", "sigmoid_squash", "tanh_squash", "if_gt", "winsorize",
 }
 # 自动登记所有 ts_* / ta_* 函数 (含动态生成的 ta_CDL*)
 _SAFE_FUNCTIONS.update(
@@ -4990,8 +5372,8 @@ _FN_FIELDS = {
 _SAFE_NAMES = {
     "abs": abs, "max": max, "min": min, "pow": pow, "round": round,
     "np": np, "pd": pd,
-    # 允许 np.maximum 中的 maximum (K线形态影线比因子的元素级取大)
-    "maximum": np.maximum,
+    # 允许 np.maximum/np.minimum 中的 maximum/minimum (K线形态影线比因子的元素级取大取小)
+    "maximum": np.maximum, "minimum": np.minimum,
 }
 
 
@@ -5293,6 +5675,39 @@ def _build_field_dfs(panel: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     return field_dfs
 
 
+class _SafeDF(pd.DataFrame):
+    """除零安全 DataFrame 子类: 重写 / 除法, 结果中出现 ±Inf(除零)时置为 NaN
+
+    背景: 表达式引擎用 eval 执行公式, div 节点渲染为原生 '/' 运算符, 无法直接拦截;
+    除零会产生 ±Inf, 后续归约(如 cs_Zscore 内部 df.std(axis=1))会触发 numpy
+    "invalid value encountered in reduce" 警告, 且 Inf 会污染相关系数等统计量。
+    通过在 evaluate_expression 中把字段面板包装为本子类, 使公式内任意位置的除法
+    (含 ts_* 中间结果)均把 ±Inf 归一为 NaN —— 与 GPU 路径 t_div 的除零保护语义一致。
+    其余行为完全继承 pandas.DataFrame, 不改动任何 ts_*/cs_* 算子原有逻辑。
+    """
+
+    @property
+    def _constructor(self):
+        # 保证 rolling/shift/sub 等算子结果仍为本子类, 除法保护可覆盖中间结果
+        return _SafeDF
+
+    @property
+    def _constructor_sliced(self):
+        return pd.Series
+
+    def __truediv__(self, other):
+        out = super().__truediv__(other)
+        if hasattr(out, "replace"):
+            return out.replace([np.inf, -np.inf], np.nan)
+        return out
+
+    def __rtruediv__(self, other):
+        out = super().__rtruediv__(other)
+        if hasattr(out, "replace"):
+            return out.replace([np.inf, -np.inf], np.nan)
+        return out
+
+
 def evaluate_expression(expr: str, panel: Dict[str, pd.DataFrame],
                         financial_lag_days: Optional[int] = None) -> pd.DataFrame:
     """
@@ -5315,6 +5730,12 @@ def evaluate_expression(expr: str, panel: Dict[str, pd.DataFrame],
 
     if not field_dfs:
         raise ValueError("面板数据中无可用字段")
+
+    # 除零保护: 把字段面板包装为 _SafeDF, 使公式内任意 '/' 除法在除零时置 NaN,
+    # 避免 ±Inf 进入归约触发 numpy "invalid value encountered in reduce" 警告
+    # (与 GPU 路径 t_div 语义一致; 不改动算子逻辑, 仅拦截除法结果)
+    field_dfs = {f: (_SafeDF(d) if isinstance(d, pd.DataFrame) else d)
+                 for f, d in field_dfs.items()}
 
     # 构建命名空间
     namespace = {**_SAFE_NAMES}

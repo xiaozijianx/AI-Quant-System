@@ -1,0 +1,1021 @@
+  <!-- ==================== Tab 5: 多因子分析 (分阶段) ==================== -->
+  <div x-show="activeTab === 'multifactor'" class="space-y-4">
+    <!-- 因子包工具条: 保存/加载可复用的多因子选股配置 -->
+    <div class="bg-white rounded-lg p-3 shadow-sm">
+      <div class="flex items-center gap-2 flex-wrap">
+        <h3 class="text-sm font-semibold text-gray-700">因子包</h3>
+        <select x-model="pkgSelectedId" @change="loadFactorPackage(pkgSelectedId)"
+                class="px-2 py-1 text-sm border rounded min-w-[220px]">
+          <option value="">-- 选择已保存的因子包 --</option>
+          <template x-for="p in factorPackages" :key="p.package_id">
+            <option :value="p.package_id" x-text="p.name + ' (' + (p.factor_ids||[]).length + '因子/' + methodLabel(p.method) + ')'"></option>
+          </template>
+        </select>
+        <input type="text" x-model="pkgSaveName" placeholder="因子包名称" class="px-2 py-1 text-sm border rounded w-44">
+        <button @click="saveFactorPackage()" :disabled="pkgSaving || !pkgSaveName.trim() || !mfResult"
+                class="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                x-text="pkgSaving ? '保存中...' : '保存因子包'"></button>
+        <button @click="deleteFactorPackage(pkgSelectedId)" x-show="pkgSelectedId"
+                class="px-2 py-1.5 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50">删除</button>
+        <span class="text-xs text-gray-400">保存当前因子 + 合成方式 + 参数 + 权重/方向，供其他页面复用选股</span>
+      </div>
+      <div class="text-xs text-gray-400 mt-1" x-show="!mfResult">运行②合成评价后可保存因子包（含权重/方向快照）。</div>
+      <!-- F3 因子包一致性校验 + 组合风险快照展示 -->
+      <div class="text-xs mt-1" x-show="pkgDetail">
+        <span class="text-green-600" x-show="pkgDetail.consistency_check && pkgDetail.consistency_check.usable">一致性校验通过 (方法 <span class="font-mono" x-text="methodLabel(pkgDetail.method)"></span> 兼容所选因子)</span>
+        <span class="text-red-600" x-show="pkgDetail.consistency_check && !pkgDetail.consistency_check.usable" x-text="pkgDetail.consistency_check.warning || '因子与合成方法不兼容'"></span>
+        <span class="text-amber-600" x-show="pkgDetail.consistency_check && pkgDetail.consistency_check.excluded && pkgDetail.consistency_check.excluded.length > 0">
+          已排除: <span class="font-mono" x-text="pkgDetail.consistency_check.excluded.map(e => e.factor_id).join(', ')"></span>
+        </span>
+        <span class="text-gray-500 ml-2" x-show="pkgDetail.portfolio_risk_snapshot && !pkgDetail.portfolio_risk_snapshot.error">
+          风险快照: 风格风险 <span class="font-mono" x-text="fmtPct(pkgRiskInfo()?.risk_decomposition?.style_pct)"></span> / 特质 <span class="font-mono" x-text="fmtPct(pkgRiskInfo()?.risk_decomposition?.idio_pct)"></span> / 年化波动 <span class="font-mono" x-text="pkgRiskInfo()?.risk_decomposition?.total_vol_annual + '%'"></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg p-4 shadow-sm">
+      <div class="grid grid-cols-6 gap-3 mb-2">
+        <div>
+          <label class="text-xs text-gray-500">股票池</label>
+          <select x-model="poolType" @change="onPoolTypeChange()" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="active">成交活跃股(自动)</option>
+            <option value="industry">申万行业</option>
+            <option value="sector">板块</option>
+            <option value="concept">概念</option>
+            <option value="index">常见指数</option>
+            <option value="custom">自定义</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500" x-text="poolLabel()"></label>
+          <template x-if="poolType === 'industry' || poolType === 'sector' || poolType === 'concept' || poolType === 'index'">
+            <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+              <option value="">请选择</option>
+              <template x-for="opt in poolOptions" :key="opt.value">
+                <option :value="opt.value" x-text="opt.label"></option>
+              </template>
+            </select>
+          </template>
+          <template x-if="poolType === 'custom'">
+            <input type="text" x-model="poolRef" placeholder="逗号分隔代码" class="w-full px-2 py-1 text-sm border rounded">
+          </template>
+          <template x-if="poolType === 'active'">
+            <input type="text" disabled value="自动(80只)" class="w-full px-2 py-1 text-sm border rounded bg-gray-50 text-gray-400">
+          </template>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">开始日期</label>
+          <input type="date" x-model="startDate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">结束日期</label>
+          <input type="date" x-model="endDate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">调仓周期(日)</label>
+          <input type="number" x-model.number="rebalPeriod" min="5" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">分组中性化</label>
+          <select x-model="mfNeutralizeGroup" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="none">无</option>
+            <option value="industry">行业</option>
+            <option value="sector">板块</option>
+            <option value="concept">概念</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 mb-2">
+        <button @click="runMultiPrep()" :disabled="mfPrepRunning"
+                class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                x-text="mfPrepRunning ? '数据准备中...' : '① 数据准备'"></button>
+        <label class="flex items-center gap-1 text-xs text-gray-500">
+          <input type="checkbox" x-model="mfNeutralizeMc" class="w-3.5 h-3.5">市值中性化
+        </label>
+        <label class="flex items-center gap-1 text-xs text-cyan-700">
+          时序标准化窗口
+          <input type="number" x-model.number="mfTsNormWindow" min="60" max="500"
+                 class="w-16 px-1.5 py-0.5 text-xs border rounded">
+          日
+        </label>
+        <span class="text-xs text-gray-400">数据准备阶段仅做截面构建与预处理(去极值/中位数/中性化)，与合成方式无关。时序标准化窗口仅对 technical_ts 类因子生效(先做自身历史滚动分位再入截面)。</span>
+      </div>
+      <div class="text-xs text-gray-400 mb-2">
+        已选因子(<span x-text="mfsSelected().length"></span>): <span x-text="mfsSelected().join(', ') || '请先在因子库勾选'" class="font-mono"></span>
+      </div>
+      <div class="text-xs text-gray-400 mb-2" x-show="mfPrepId">
+        <span class="text-green-600">阶段B1数据准备已完成 (prep_id: <span class="font-mono" x-text="mfPrepId ? String(mfPrepId).slice(0,8) : '-'"></span>), 切换下方合成方式可复用, 无需重新准备。</span>
+      </div>
+      <div class="text-xs text-gray-400" x-show="(mfPrepResult && mfPrepResult.prep_error)">
+        <span class="text-amber-600" x-text="mfPrepResult.prep_error"></span>
+      </div>
+      <!-- F0 预检结果: 跳过/异常因子显式列出原因, 不静默吞错 -->
+      <div class="text-xs mb-2" x-show="(mfPrepResult && mfPrepResult.preflight && ((mfPrepResult.preflight.skip_ids||[]).length > 0 || (mfPrepResult.preflight.error_ids||[]).length > 0))">
+        <span class="text-gray-500" x-text="mfPrepResult.preflight.summary"></span>
+        <template x-for="pf in mfPrepResult.preflight.factors || []" :key="pf.factor_id">
+          <div class="text-[11px] pl-2" x-show="pf.status !== 'ok'">
+            <span :class="pf.status === 'error' ? 'text-red-600' : 'text-amber-600'"
+                  x-text="pf.factor_id + ' (' + (pf.factor_type || '-') + '): ' + (pf.reason || '')"></span>
+          </div>
+        </template>
+      </div>
+      <div class="text-xs text-gray-400" x-show="mfResult?.multi_result?.error">
+        <span class="text-amber-600" x-text="mfResult.multi_result.error"></span>
+      </div>
+      <!-- F0 自动匹配: 方法×类型 降级/排除/警告 (不兼容因子自动移出合成并提示) -->
+      <div class="text-xs mb-2" x-show="(mfResult && mfResult.auto_match && (mfResult.auto_match.warning || (mfResult.auto_match.excluded || []).length > 0))">
+        <span class="text-amber-600" x-show="mfResult.auto_match.warning" x-text="mfResult.auto_match.warning"></span>
+        <template x-for="ex in mfResult.auto_match.excluded || []" :key="ex.factor_id">
+          <div class="text-[11px] pl-2 text-amber-600" x-text="ex.factor_id + ' (' + (ex.factor_type || '-') + '): ' + (ex.reason || '')"></div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ===== ML 参数配置面板 (选机器学习时显示) ===== -->
+    <div x-show="mfMethod === 'ml_reg' || mfMethod === 'ml_cls'" class="bg-white rounded-lg p-3 shadow-sm">
+      <h3 class="text-sm font-semibold mb-2 text-gray-700">机器学习参数 (可调整, 调整后重新运行②即可, 无需重新数据准备)
+        <span class="ml-2 text-xs font-normal text-gray-400" x-text="mfMethod==='ml_reg' ? '(回归: 因子值→预测收益, 按收益排序选股)' : '(分类: 因子值→涨跌概率, 概率当综合因子信号)'"></span>
+      </h3>
+      <div class="grid grid-cols-5 gap-2 mb-2">
+        <div>
+          <label class="text-xs text-gray-500">模型</label>
+          <select x-model="mfMLParams.model_type" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="xgboost">XGBoost</option>
+            <option value="lightgbm">LightGBM</option>
+            <option value="rf">随机森林</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">学习率</label>
+          <input type="number" step="0.01" min="0.001" x-model.number="mfMLParams.learning_rate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">树数量</label>
+          <input type="number" min="10" x-model.number="mfMLParams.n_estimators" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">最大深度</label>
+          <input type="number" min="1" max="20" x-model.number="mfMLParams.max_depth" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">样本采样</label>
+          <input type="number" step="0.1" min="0.1" max="1" x-model.number="mfMLParams.subsample" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">特征采样</label>
+          <input type="number" step="0.1" min="0.1" max="1" x-model.number="mfMLParams.colsample_bytree" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">L1正则</label>
+          <input type="number" step="0.1" min="0" x-model.number="mfMLParams.reg_alpha" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">L2正则</label>
+          <input type="number" step="0.1" min="0" x-model.number="mfMLParams.reg_lambda" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div class="flex items-end">
+          <button @click="runMultiSynth()" :disabled="synthDisabled()"
+                  class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  x-text="mfSynthRunning ? '评价中...' : '② 运行合成评价'"></button>
+        </div>
+      </div>
+      <div class="grid grid-cols-4 gap-2 border-t pt-2 mt-1">
+        <div>
+          <label class="text-xs text-gray-500">重要性保留阈值</label>
+          <input type="number" step="0.01" min="0" x-model.number="mfSynthCfg.ml.min_importance" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div x-show="mfMethod === 'ml_cls'">
+          <label class="text-xs text-gray-500">Purged时序CV(AUC评估)</label>
+          <select x-model="mfSynthCfg.ml.purged_cv" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="true">开启</option>
+            <option value="false">关闭</option>
+          </select>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <span class="text-xs text-gray-400">特征重要性在下方结果区展示，可点击「按重要性筛选并重训」手动触发剔除低重要度因子。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 筛选/去冗余/方向/PCA 可配置参数面板 ===== -->
+    <div class="bg-white rounded-lg p-3 shadow-sm">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-semibold text-gray-700">② 合成评价参数 (合成方式 + 筛选/去冗余/方向/PCA)</h3>
+        <label class="flex items-center text-xs text-gray-500 gap-1">
+          <input type="checkbox" x-model="mfSynthCfg.screening.enable" class="w-3.5 h-3.5">启用因子筛选
+        </label>
+      </div>
+      <p class="text-xs text-gray-400 mb-2">数据准备完成后，在此选择合成方式与参数再运行②合成评价；切换合成方式无需重新数据准备。筛选流程：IC阈值淘汰 → 跨期相关性去冗余 → 方向自动判断(按IC符号)。</p>
+      <!-- F0 实时提示: 连续因子数决定合成方法可用性 (〇·九, 需≥2个连续因子) -->
+      <p class="text-[11px] mb-2" x-show="mfsSelected().length > 0">
+        <span :class="mfContinuousCount() < 2 ? 'text-red-600' : 'text-green-600'"
+              x-text="mfContinuousCount() < 2 ? ('当前已选连续因子(技术/时序标准化) ' + mfContinuousCount() + ' 个, 需≥2个才能多因子合成; 仅信号/财务因子将仅做单因子评价') : ('当前已选连续因子(技术/时序标准化) ' + mfContinuousCount() + ' 个, 可正常合成')"></span>
+      </p>
+      <div class="grid grid-cols-6 gap-2">
+        <div>
+          <label class="text-xs text-gray-500">合成方式</label>
+          <select x-model="mfMethod" class="w-full px-2 py-1 text-sm border rounded">
+            <optgroup label="线性加权">
+              <option value="equal">等权</option>
+              <option value="ic_weighted">IC加权</option>
+              <option value="sharpe">夏普加权</option>
+              <option value="markowitz">Markowitz</option>
+              <option value="optuna">Optuna</option>
+              <option value="lasso">Lasso</option>
+            </optgroup>
+            <optgroup label="排名打分">
+              <option value="rank_score">排名打分</option>
+            </optgroup>
+            <optgroup label="模型映射">
+              <option value="ml_reg">ML回归</option>
+              <option value="ml_cls">ML分类</option>
+            </optgroup>
+            <optgroup label="降维投影">
+              <option value="pca">PCA</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">IC阈值</label>
+          <input type="number" step="0.01" min="0" x-model.number="mfSynthCfg.screening.ic_thresh" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">最小非空率</label>
+          <input type="number" step="0.05" min="0" max="1" x-model.number="mfSynthCfg.screening.min_non_null" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">最小覆盖率</label>
+          <input type="number" step="0.05" min="0" max="1" x-model.number="mfSynthCfg.screening.min_rebal_coverage" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">去冗余相关阈值</label>
+          <input type="number" step="0.05" min="0" max="1" x-model.number="mfSynthCfg.redundancy.corr_thresh" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">方向自动判断</label>
+          <select x-model="mfSynthCfg.direction.auto" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="true">开启</option>
+            <option value="false">关闭</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" x-model="mfSynthCfg.direction.override_manual" class="w-3.5 h-3.5">
+            自动方向覆盖手工配置
+          </label>
+          <p class="text-[11px] text-gray-400 mt-1">开启后: 连手工标的方向也交给历史IC判断 (用于手工方向不确定的场景); 仅"方向自动判断"开启时生效</p>
+        </div>
+        <div x-show="mfMethod === 'pca'">
+          <label class="text-xs text-gray-500">PCA主成分数(空=自动)</label>
+          <input type="number" min="1" x-model.number="mfSynthCfg.pca.n_components" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div x-show="mfMethod === 'pca'">
+          <label class="text-xs text-gray-500">PCA解释方差阈值</label>
+          <input type="number" step="0.05" min="0.1" max="1" x-model.number="mfSynthCfg.pca.explained_var" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div x-show="mfMethod === 'optuna'">
+          <label class="text-xs text-gray-500">Optuna搜索次数</label>
+          <input type="number" min="5" x-model.number="mfSynthCfg.optuna.n_trials" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" x-model="mfSynthCfg.neutralize_port" class="w-3.5 h-3.5">
+            组合中性化
+          </label>
+          <p class="text-[11px] text-gray-400 mt-1">F1风险阶段: 调权重使组合风格暴露贴近基准(压平风格赌注), 展示中性化前后暴露与收益影响</p>
+        </div>
+      </div>
+      <div x-show="mfMethod !== 'ml_reg' && mfMethod !== 'ml_cls'" class="flex items-center gap-3 mt-2">
+        <button @click="runMultiSynth()" :disabled="synthDisabled()"
+                class="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                x-text="mfSynthRunning ? '评价中...' : '② 运行合成评价'"></button>
+        <span class="text-xs text-amber-600" x-show="(mfPrepResult && mfPrepResult.prep_error)" x-text="mfPrepResult.prep_error"></span>
+        <span class="text-xs text-gray-400" x-show="!mfPrepId">请先执行①数据准备</span>
+      </div>
+    </div>
+
+    <!-- ===== 阶段B1结果: 单因子预评价 + 预处理清洗诊断 ===== -->
+    <div x-show="mfPrepId" class="space-y-4">
+      <!-- 单因子预评价结果 -->
+      <div class="bg-white rounded-lg p-3 shadow-sm">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">一、单因子预评价</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600 text-xs">
+              <tr>
+                <th class="px-2 py-1.5 text-left">因子</th>
+                <th class="px-2 py-1.5 text-left">类型</th>
+                <th class="px-2 py-1.5 text-right">样本数</th>
+                <th class="px-2 py-1.5 text-right">NaN占比</th>
+                <th class="px-2 py-1.5 text-right">IC均值</th>
+                <th class="px-2 py-1.5 text-right">ICIR</th>
+                <th class="px-2 py-1.5 text-right">IC胜率</th>
+                <th class="px-2 py-1.5 text-left">说明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="sr in mfPrepResult.single_results" :key="sr.factor_id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-2 py-1.5 font-mono text-xs" x-text="sr.factor_id"></td>
+                  <td class="px-2 py-1.5">
+                    <span class="px-1.5 py-0.5 text-xs rounded"
+                          :class="evalTypeStyle(sr.factor_type)"
+                          x-text="evalTypeText(sr.factor_type)"></span>
+                  </td>
+                  <td class="px-2 py-1.5 text-right text-xs" x-text="sr.data_stats?.count ?? '-'"></td>
+                  <td class="px-2 py-1.5 text-right text-xs" x-text="sr.data_stats ? fmtPct(sr.data_stats.nan_ratio) : '-'"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" :class="icColor(sr.ic_result?.ic_mean)" x-text="sr.ic_result ? fmtNum(sr.ic_result.ic_mean) : (sr.pattern_evaluation ? fmtPct(sr.pattern_evaluation?.hit_rate?.overall_hit_rate) : '-')"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="sr.ic_result ? fmtNum(sr.ic_result.ir) : '-'"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="sr.ic_result ? fmtPct(sr.ic_result.ic_win_rate) : '-'"></td>
+                  <td class="px-2 py-1.5 text-xs text-gray-500">
+                    <span x-show="isSignalType(sr.factor_type)">事件信号评价(命中率)</span>
+                    <span x-show="sr.factor_type==='financial'">财务因子(财报期对齐)
+                      <template x-if="sr.financial_quality">
+                        <span class="text-purple-600">, 中位数填充占比 <span x-text="fmtPct(sr.financial_quality.fill_ratio)"></span>, 财报调仓点 <span x-text="sr.financial_quality.n_report_dates ?? 0"></span></span>
+                      </template>
+                    </span>
+                    <span x-show="sr.factor_type==='technical_ts'">时序分位化后截面评价(窗口 <span x-text="sr.ts_normalize_window || 250"></span>日)</span>
+                    <span x-show="sr.factor_type==='technical' && !sr.ic_result && sr.status !== 'error' && sr.status !== 'skip'">技术因子</span>
+                    <span x-show="sr.status==='error' || sr.status==='skip'" :class="sr.status==='error' ? 'text-red-500' : 'text-amber-600'" x-text="sr.reason || ''"></span>
+                    <span x-show="sr.error" class="text-red-500" x-text="'错误: ' + sr.error"></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 预处理清洗诊断 -->
+      <div class="bg-white rounded-lg p-3 shadow-sm">
+        <h3 class="text-sm font-semibold mb-1 text-gray-700">二、预处理清洗数据分布 / 残缺诊断</h3>
+        <p class="text-xs text-gray-400 mb-2">以下为技术类连续因子经 3倍MAD去极值 + 中位数填充 + 中性化 清洗后的截面数据分布与完整性 (调仓期数: <span class="font-mono" x-text="mfPrepResult.prep_diagnostics?.n_rebalances ?? 0"></span>)。</p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600 text-xs">
+              <tr>
+                <th class="px-2 py-1.5 text-left">因子</th>
+                <th class="px-2 py-1.5 text-right">样本数</th>
+                <th class="px-2 py-1.5 text-right">非空率</th>
+                <th class="px-2 py-1.5 text-right">残缺期数</th>
+                <th class="px-2 py-1.5 text-right">均值</th>
+                <th class="px-2 py-1.5 text-right">标准差</th>
+                <th class="px-2 py-1.5 text-right">最小值</th>
+                <th class="px-2 py-1.5 text-right">最大值</th>
+                <th class="px-2 py-1.5 text-left">分布</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="fs in mfPrepResult.prep_diagnostics?.factor_stats || []" :key="fs.factor_id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-2 py-1.5 font-mono text-xs" x-text="fs.factor_id"></td>
+                  <td class="px-2 py-1.5 text-right text-xs" x-text="fs.count"></td>
+                  <td class="px-2 py-1.5 text-right text-xs" x-text="fmtPct(fs.non_null_rate)"></td>
+                  <td class="px-2 py-1.5 text-right text-xs" :class="fs.rebal_coverage < 1 ? 'text-red-500' : 'text-gray-500'" x-text="fs.rebal_coverage < 1 ? (Math.round((1 - fs.rebal_coverage) * 100) + '%') : '0'"></td>
+                  <td class="px-2 py-1.5 text-right font-mono text-xs" x-text="fs.mean != null ? fmtNum(fs.mean) : '-'"></td>
+                  <td class="px-2 py-1.5 text-right font-mono text-xs" x-text="fs.std != null ? fmtNum(fs.std) : '-'"></td>
+                  <td class="px-2 py-1.5 text-right font-mono text-xs" x-text="fs.min != null ? fmtNum(fs.min) : '-'"></td>
+                  <td class="px-2 py-1.5 text-right font-mono text-xs" x-text="fs.max != null ? fmtNum(fs.max) : '-'"></td>
+                  <td class="px-2 py-1.5">
+                    <div class="flex items-center gap-1" x-show="fs.min != null">
+                      <div class="text-[10px] text-gray-400 font-mono" x-text="fmtNum(fs.min)"></div>
+                      <div class="flex-1 bg-gray-100 h-1.5 rounded overflow-hidden">
+                        <!-- 简单直方条: 以均值位置分段示意 -->
+                        <div class="h-1.5 rounded" :style="'width:' + Math.max(4, Math.min(96, Math.abs(fs.mean) * 100)) + '%;' + (fs.mean >= 0 ? 'margin-left:' + (50 - Math.max(2, Math.abs(fs.mean) * 50)) + '%;' : 'margin-left:48%;') + 'background:linear-gradient(90deg,#6366f1,#10b981)'"></div>
+                      </div>
+                      <div class="text-[10px] text-gray-400 font-mono" x-text="fmtNum(fs.max)"></div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== 阶段B2结果: 组合评价 ===== -->
+    <div x-show="mfResult" class="space-y-4">
+      <div x-show="mfResult.multi_result && !mfResult.multi_result.error">
+        <!-- 因子筛选/去冗余/方向/权重 报告 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">二、因子筛选 / 去冗余 / 方向</h3>
+          <!-- 筛选口径提示: 全历史IC(选择前视), 评价口径偏乐观 -->
+          <div x-show="mfResult.multi_result.screening_caveat"
+               class="mb-2 flex items-start gap-1 text-cyan-700 bg-cyan-50 rounded px-2 py-1 text-xs">
+            <span>口径提示</span>
+            <span x-text="mfResult.multi_result.screening_caveat"></span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="text-xs text-gray-500 mb-1">筛选淘汰 (IC阈值 <span class="font-mono" x-text="mfResult.multi_result.screening?.ic_thresh ?? 0.02"></span>)</div>
+              <div class="text-xs" x-show="!mfResult.multi_result.screening?.dropped?.length">全部通过筛选</div>
+              <template x-for="d in mfResult.multi_result.screening?.dropped || []" :key="d.factor_id">
+                <div class="text-xs text-red-500 font-mono" x-text="d.factor_id + ' — ' + (d.reason || '')"></div>
+              </template>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500 mb-1">去冗余剔除 (|corr|> <span class="font-mono" x-text="mfResult.multi_result.redundancy?.corr_thresh ?? 0.8"></span>)</div>
+              <div class="text-xs" x-show="!mfResult.multi_result.redundancy?.removed?.length">无冗余因子</div>
+              <template x-for="d in mfResult.multi_result.redundancy?.removed || []" :key="d.factor_id">
+                <div class="text-xs text-amber-600 font-mono" x-text="d.factor_id + ' (与 ' + d.corr_with + ' 相关 ' + d.corr + ')'"></div>
+              </template>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mt-2">
+            <div>
+              <div class="text-xs text-gray-500 mb-1">方向(自动判断)</div>
+              <div class="flex flex-wrap gap-1">
+                <template x-for="(d,f) in mfResult.multi_result.direction_used || {}" :key="f">
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 font-mono" x-text="f + ':' + (d>0?'+':'-')"></span>
+                </template>
+              </div>
+            </div>
+            <div x-show="mfResult.multi_result.weights">
+              <div class="text-xs text-gray-500 mb-1">优化权重</div>
+              <div class="flex flex-wrap gap-1">
+                <template x-for="(w,f) in mfResult.multi_result.weights" :key="f">
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-mono" x-text="f + ':' + (w*100).toFixed(1) + '%'"></span>
+                </template>
+              </div>
+            </div>
+            <div x-show="mfResult.multi_result.method === 'ml_cls'">
+              <div class="text-xs text-gray-500 mb-1">分类评估</div>
+              <div class="text-xs" x-show="mfResult.multi_result.ml_purged_auc">Purged CV AUC: <span class="font-mono font-semibold" x-text="mfResult.multi_result.ml_purged_auc"></span></div>
+              <div class="text-xs" x-show="mfResult.multi_result.ml_importance_feedback">反馈剔除: <span class="font-mono" x-text="(mfResult.multi_result.ml_importance_feedback.dropped||[]).join(', ') || '无'"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- F2 信号方向得分轨 (含信号因子时展示) -->
+        <div class="bg-white rounded-lg p-3 shadow-sm" x-show="mfResult?.multi_result?.signal_track">
+          <h3 class="text-sm font-semibold mb-1 text-gray-700">信号方向得分轨 (信号因子)</h3>
+          <p class="text-[11px] text-gray-400 mb-1" x-text="mfResult.multi_result.signal_track.signal_only ? '仅信号因子模式: 综合信号方向得分作为单一合成因子参与选股' : '信号因子按方向语义转成方向得分, 与连续合成综合因子叠加(次级倾斜, 系数0.5), 使信号因子参与选股又不主导'"></p>
+          <div class="flex flex-wrap gap-1 mb-1">
+            <template x-for="(m, fid) in mfResult?.multi_result?.signal_track?.per_factor || {}" :key="fid">
+              <span class="text-xs px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-mono"
+                    x-text="fid + ' (' + (m.bipolar ? '双极性' : '单极性') + ', 方向' + (m.direction>0?'+':(m.direction<0?'-':'0')) + ')'"></span>
+            </template>
+          </div>
+          <div class="text-xs text-gray-500" x-show="(mfResult?.multi_result?.signal_track?.score_series || []).length > 0">
+            平均方向得分 <span class="font-mono" x-text="fmtNum(mfAvgOf(mfResult?.multi_result?.signal_track?.score_series, 'mean_score'))"></span>
+            / 平均信号触发率 <span class="font-mono" x-text="fmtPct(mfAvgOf(mfResult?.multi_result?.signal_track?.score_series, 'signal_rate'))"></span>
+          </div>
+        </div>
+
+        <!-- 技术类因子相关性 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">三、技术类因子相关性 (跨期平均)</h3>
+          <div id="mf-corr-chart" style="height: 320px;"></div>
+        </div>
+
+        <!-- 组合 IC 指标卡 -->
+        <div class="grid grid-cols-5 gap-2">
+          <div class="bg-white rounded-lg p-3 shadow-sm text-center">
+            <div class="text-xs text-gray-500">IC均值</div>
+            <div class="text-xl font-bold" :class="icColor(mfResult.multi_result.ic_mean)" x-text="fmtNum(mfResult.multi_result.ic_mean)"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm text-center">
+            <div class="text-xs text-gray-500">ICIR</div>
+            <div class="text-xl font-bold" x-text="fmtNum(mfResult.multi_result.ic_ir)"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm text-center">
+            <div class="text-xs text-gray-500">IC胜率</div>
+            <div class="text-xl font-bold" x-text="fmtPct(mfResult.multi_result.ic_win_rate)"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm text-center">
+            <div class="text-xs text-gray-500">多空收益</div>
+            <div class="text-xl font-bold" x-text="fmtPct(mfResult.multi_result.layered?.long_short)"></div>
+          </div>
+          <div class="bg-white rounded-lg p-3 shadow-sm text-center">
+            <div class="text-xs text-gray-500">调仓次数</div>
+            <div class="text-xl font-bold" x-text="mfResult.multi_result.n_rebalances"></div>
+          </div>
+        </div>
+
+        <!-- ML 特征重要性 -->
+        <div x-show="mfResult.multi_result.ml_feature_importance" class="bg-white rounded-lg p-3 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">ML 特征重要性</h3>
+            <button @click="runMultiSynth(true)" :disabled="mfSynthRunning"
+                    class="px-2.5 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                    x-text="mfSynthRunning ? '筛选重训中...' : '按重要性筛选并重训'"></button>
+          </div>
+          <div class="space-y-1">
+            <template x-for="item in Object.entries(mfResult.multi_result.ml_feature_importance)" :key="item[0]">
+              <div class="flex items-center gap-2">
+                <span class="text-xs w-32 truncate font-mono" :title="item[0]" x-text="item[0]"></span>
+                <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div class="bg-indigo-500 h-2 rounded-full" :style="'width: ' + (item[1]*100) + '%'"></div>
+                </div>
+                <span class="text-xs text-gray-500 w-14 text-right" x-text="(item[1]*100).toFixed(2) + '%'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- IC 时序 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">四、组合 IC 时序</h3>
+          <div id="mf-ic-chart" style="height: 250px;"></div>
+        </div>
+
+        <!-- 分层回测 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">五、分层回测</h3>
+          <div id="mf-layer-chart" style="height: 250px;"></div>
+        </div>
+
+        <!-- Top-N 组合净值 + 基准 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">六、Top-N 组合净值(含成本) vs 基准</h3>
+          <div id="mf-nav-chart" style="height: 320px;"></div>
+        </div>
+
+        <!-- Top-N 绩效指标表 -->
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <h3 class="text-sm font-semibold mb-2 text-gray-700">七、组合绩效指标</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 text-gray-600 text-xs">
+                <tr>
+                  <th class="px-2 py-1.5 text-left">组合</th>
+                  <th class="px-2 py-1.5 text-right">累计收益</th>
+                  <th class="px-2 py-1.5 text-right">年化</th>
+                  <th class="px-2 py-1.5 text-right">夏普</th>
+                  <th class="px-2 py-1.5 text-right">最大回撤</th>
+                  <th class="px-2 py-1.5 text-right">卡玛</th>
+                  <th class="px-2 py-1.5 text-right">胜率</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="(m, key) in mfResult.multi_result.portfolio?.metrics || {}" :key="key">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-2 py-1.5 font-mono text-xs" x-text="('Top' + key)"></td>
+                    <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(m.total)"></td>
+                    <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(m.annual)"></td>
+                    <td class="px-2 py-1.5 text-right font-mono" x-text="fmtNum(m.sharpe)"></td>
+                    <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(m.max_dd)"></td>
+                    <td class="px-2 py-1.5 text-right font-mono" x-text="fmtNum(m.calmar)"></td>
+                    <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(m.win_rate)"></td>
+                  </tr>
+                </template>
+                <tr class="bg-gray-50">
+                  <td class="px-2 py-1.5 font-mono text-xs">基准(等权)</td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(mfResult.multi_result.portfolio?.benchmark_metrics?.total)"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(mfResult.multi_result.portfolio?.benchmark_metrics?.annual)"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="fmtNum(mfResult.multi_result.portfolio?.benchmark_metrics?.sharpe)"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(mfResult.multi_result.portfolio?.benchmark_metrics?.max_dd)"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="fmtNum(mfResult.multi_result.portfolio?.benchmark_metrics?.calmar)"></td>
+                  <td class="px-2 py-1.5 text-right font-mono" x-text="fmtPct(mfResult.multi_result.portfolio?.benchmark_metrics?.win_rate)"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== F1 组合风险分析 (清华风险阶段: Barra风格暴露/风险分解/归因/中性化) ===== -->
+        <div class="bg-white rounded-lg p-3 shadow-sm" x-show="mfResult.multi_result.portfolio_risk && !mfResult.multi_result.portfolio_risk.error">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">八、组合风险分析 (Barra风格: 暴露 / 风险分解 / 归因)</h3>
+            <select x-model="mfRiskTopN" class="px-2 py-1 text-xs border rounded"
+                    x-show="Object.keys(mfResult.multi_result.portfolio_risk.per_top_n || {}).length > 1">
+              <template x-for="k in Object.keys(mfResult.multi_result.portfolio_risk.per_top_n || {})" :key="k">
+                <option :value="k" x-text="'Top' + k"></option>
+              </template>
+            </select>
+          </div>
+          <p class="text-[11px] text-gray-400 mb-2" x-text="mfResult.multi_result.portfolio_risk.note"></p>
+          <div class="grid grid-cols-3 gap-3">
+            <!-- 风格暴露柱状图 -->
+            <div>
+              <div class="text-xs text-gray-500 mb-1">风格暴露 (组合 vs 基准)</div>
+              <div id="mf-risk-exposure-chart" style="height: 220px;"></div>
+            </div>
+            <!-- 风险分解环形图 -->
+            <div>
+              <div class="text-xs text-gray-500 mb-1">风险分解 (风格 vs 特质)</div>
+              <div id="mf-risk-decomp-chart" style="height: 220px;"></div>
+            </div>
+            <!-- 归因 -->
+            <div>
+              <div class="text-xs text-gray-500 mb-1">超额收益归因 (风格贡献 vs alpha)</div>
+              <div id="mf-risk-attribution-chart" style="height: 220px;"></div>
+            </div>
+          </div>
+          <!-- 中性化信息 (启用时显示) -->
+          <div class="mt-2 text-xs" x-show="mfRiskInfo().neutralization && mfRiskInfo().neutralization.enabled">
+            <span class="text-green-600 font-semibold">组合中性化已启用:</span>
+            <span class="text-gray-600">收益影响(每期平均) <span class="font-mono" x-text="mfRiskInfo().neutralization && mfRiskInfo().neutralization.return_impact != null ? fmtPct(mfRiskInfo().neutralization.return_impact) : '-'"></span></span>
+            <span class="text-gray-400 ml-2" x-text="mfRiskInfo().neutralization && mfRiskInfo().neutralization.note || ''"></span>
+          </div>
+          <div class="mt-2 text-xs text-red-500" x-show="mfResult.multi_result.portfolio_risk.error"
+               x-text="mfResult.multi_result.portfolio_risk.error"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 因子详情弹窗 ==================== -->
+  <div x-show="showDetailModal" x-cloak class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+       @click.self="showDetailModal = false">
+    <div class="bg-white rounded-lg p-6 w-[700px] max-h-[80vh] overflow-y-auto shadow-xl">
+      <div class="flex justify-between items-start mb-3">
+        <div>
+          <h3 class="text-lg font-semibold" x-text="detailData?.factor?.name || '加载中...'"></h3>
+          <p class="text-xs text-gray-500 font-mono" x-text="detailData?.factor?.factor_id"></p>
+        </div>
+        <button @click="showDetailModal = false" class="text-gray-400 hover:text-gray-600 text-xl">×</button>
+      </div>
+      <template x-if="detailData">
+        <div class="space-y-3">
+          <!-- 基本信息 -->
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><span class="text-gray-500">分类:</span> <span x-text="detailData.factor.category"></span></div>
+            <div><span class="text-gray-500">子类:</span> <span x-text="detailData.factor.sub_category || '-'"></span></div>
+            <div><span class="text-gray-500">方向:</span> <span x-text="directionText(detailData.factor.direction)"></span></div>
+            <div><span class="text-gray-500">因子类型:</span> <span x-text="originTypeText(detailData.factor)"></span></div>
+            <div><span class="text-gray-500">来源(CASE):</span> <span class="text-xs" x-text="detailData.factor.origin || '-'"></span></div>
+            <div><span class="text-gray-500">数据源:</span> <span x-text="detailData.factor.data_source || '-'"></span></div>
+            <div><span class="text-gray-500">周期:</span> <span x-text="detailData.factor.period || '-'"></span></div>
+            <div><span class="text-gray-500">自定义:</span> <span x-text="detailData.factor.is_custom ? '是' : '否'"></span></div>
+            <div class="col-span-2"><span class="text-gray-500">评价方式:</span>
+              <span class="px-1.5 py-0.5 text-xs rounded ml-1"
+                    :class="evalTypeStyle(factorEvalType(detailData.factor))"
+                    x-text="evalTypeText(factorEvalType(detailData.factor))"></span>
+              <span class="text-xs text-gray-400 ml-1"
+                    x-text="(detailData.factor.evaluation_type||'').trim() ? '(手工维护)' : '(自动推断)'"></span>
+            </div>
+            <div><span class="text-gray-500">基类:</span>
+              <!-- 单一基类 -->
+              <span x-show="detailData.base && (!detailData.base_list || detailData.base_list.length <= 1)" class="text-xs">
+                <span x-text="detailData.base.name"></span>
+                <span class="text-gray-400 font-mono">(<span x-text="detailData.base.base_id"></span>)</span>
+              </span>
+              <!-- 多基类(逗号分隔, 多因子组合) -->
+              <span x-show="detailData.base_list && detailData.base_list.length > 1" class="flex flex-wrap gap-1">
+                <template x-for="b in detailData.base_list" :key="b.base_id">
+                  <span class="px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-700">
+                    <span x-text="b.name"></span>
+                    <span class="text-gray-400 font-mono">(<span x-text="b.base_id"></span>)</span>
+                  </span>
+                </template>
+              </span>
+              <span x-show="!detailData.base && (!detailData.base_list || detailData.base_list.length === 0)" class="text-gray-400">-</span>
+            </div>
+          </div>
+          <!-- 公式 -->
+          <div>
+            <div class="text-xs text-gray-500 mb-1">公式/计算逻辑</div>
+            <div class="bg-gray-50 rounded p-2 text-xs font-mono break-all" x-text="detailData.factor.formula || '-'"></div>
+          </div>
+          <!-- 评价方式修改 (路由入口显式维护; "自动"=清除标签回退公式规则推断) -->
+          <div class="flex items-center gap-2 bg-gray-50 rounded p-2">
+            <span class="text-xs text-gray-500">修改评价方式:</span>
+            <select x-model="detailEvalType" class="px-2 py-1 text-xs border rounded bg-white">
+              <option value="">自动(按公式规则推断)</option>
+              <option value="technical">技术(截面连续型)</option>
+              <option value="technical_ts">时序标准化(量纲不可比因子)</option>
+              <option value="signal">事件信号(离散信号型)</option>
+              <option value="financial">财务(财报期对齐)</option>
+              <option value="none">不可独立评价</option>
+            </select>
+            <button @click="saveDetailEvalType()" :disabled="detailEvalSaving"
+                    class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    x-text="detailEvalSaving ? '保存中...' : '保存'"></button>
+            <span class="text-xs text-gray-400">评价方式决定因子走哪种评价管线(IC/分层、时序分位化、事件信号、财报对齐)</span>
+          </div>
+          <!-- 性能指标 -->
+          <div x-show="detailData.metrics_history && detailData.metrics_history.length > 0">
+            <div class="text-xs text-gray-500 mb-1">性能指标历史 (最近5期)</div>
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-2 py-1 text-left">评估日</th>
+                  <th class="px-2 py-1 text-right">IC</th>
+                  <th class="px-2 py-1 text-right">IR</th>
+                  <th class="px-2 py-1 text-right">RankIC</th>
+                  <th class="px-2 py-1 text-right">IC胜率</th>
+                  <th class="px-2 py-1 text-right">多空收益</th>
+                  <th class="px-2 py-1 text-left">区间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="m in (detailData.metrics_history || []).slice(0, 5)" :key="m.id">
+                  <tr class="border-b">
+                    <td class="px-2 py-1" x-text="m.eval_date"></td>
+                    <td class="px-2 py-1 text-right font-mono" :class="icColor(m.ic_mean)" x-text="fmtNum(m.ic_mean)"></td>
+                    <td class="px-2 py-1 text-right font-mono" :class="icColor(m.ir)" x-text="fmtNum(m.ir)"></td>
+                    <td class="px-2 py-1 text-right font-mono" x-text="fmtNum(m.rank_ic_mean)"></td>
+                    <td class="px-2 py-1 text-right" x-text="fmtPct(m.ic_positive_ratio)"></td>
+                    <td class="px-2 py-1 text-right font-mono" :class="icColor(m.long_short_return)" x-text="fmtPct(m.long_short_return)"></td>
+                    <td class="px-2 py-1 text-xs text-gray-400" x-text="m.eval_period"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="!detailData.metrics_history || detailData.metrics_history.length === 0"
+               class="text-xs text-gray-400 bg-gray-50 rounded p-2 text-center">
+            暂无性能指标, 请点击「批量性能分析」或「评估」按钮
+          </div>
+          <!-- 评估按钮 -->
+          <div class="flex justify-end gap-2 pt-2 border-t" x-show="isEvaluable(detailData.factor.factor_id)">
+            <button @click="evaluateSingle(detailData.factor.factor_id); showDetailModal = false"
+                    class="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700">
+              运行单因子评估
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ==================== 单因子评估弹窗 ==================== -->
+  <div x-show="showEvalModal" x-cloak class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+       @click.self="showEvalModal = false">
+    <div class="bg-white rounded-lg p-6 w-[1100px] max-h-[90vh] overflow-y-auto shadow-xl">
+      <div class="flex justify-between items-start mb-3">
+        <div>
+          <h3 class="text-lg font-semibold">因子详情: <span x-text="evaluatingFactorId"></span></h3>
+          <p class="text-xs text-gray-500" x-show="singleEvalResult" x-text="'样本: ' + (singleEvalResult?.n_stocks||0) + ' 只股票, ' + (singleEvalResult?.n_dates||0) + ' 个交易日'"></p>
+        </div>
+        <button @click="showEvalModal = false" class="text-gray-400 hover:text-gray-600 text-xl">×</button>
+      </div>
+      <div x-show="singleEvalLoading" class="text-center py-8 text-gray-400 text-sm">评估中, 请稍候...</div>
+      <template x-if="singleEvalResult && !singleEvalLoading">
+        <div class="space-y-3">
+          <!-- 1. 因子基本信息 -->
+          <div class="bg-gray-50 rounded p-3">
+            <div class="text-xs font-semibold text-gray-600 mb-2">因子基本信息</div>
+            <div class="grid grid-cols-4 gap-2 text-sm">
+              <div><span class="text-gray-500">名称:</span> <span x-text="singleEvalResult?.factor_info?.name"></span></div>
+              <div><span class="text-gray-500">分类:</span> <span x-text="(singleEvalResult?.factor_info?.category||'') + ' / ' + (singleEvalResult?.factor_info?.sub_category||'')"></span></div>
+              <div><span class="text-gray-500">方向:</span> <span x-text="singleEvalResult?.factor_info?.direction"></span></div>
+              <div><span class="text-gray-500">周期:</span> <span x-text="singleEvalResult?.factor_info?.period"></span></div>
+              <div><span class="text-gray-500">数据源:</span> <span x-text="singleEvalResult?.factor_info?.data_source"></span></div>
+              <div><span class="text-gray-500">来源:</span> <span x-text="singleEvalResult?.factor_info?.origin"></span></div>
+              <div><span class="text-gray-500">基类:</span> <span x-text="singleEvalResult?.factor_info?.base_id"></span></div>
+            </div>
+            <div class="mt-2 text-xs">
+              <span class="text-gray-500">公式:</span>
+              <code class="bg-gray-200 px-2 py-0.5 rounded text-blue-700" x-text="singleEvalResult?.factor_info?.formula"></code>
+            </div>
+          </div>
+
+          <!-- 2. 数据统计 + 有效性评级 -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-gray-50 rounded p-3">
+              <div class="text-xs font-semibold text-gray-600 mb-2">数据统计</div>
+              <div class="grid grid-cols-4 gap-1 text-center text-sm">
+                <div><div class="text-xs text-gray-400">均值</div><div class="font-bold" x-text="fmtNum(singleEvalResult?.data_stats?.mean)"></div></div>
+                <div><div class="text-xs text-gray-400">标准差</div><div class="font-bold" x-text="fmtNum(singleEvalResult?.data_stats?.std)"></div></div>
+                <div><div class="text-xs text-gray-400">中位数</div><div class="font-bold" x-text="fmtNum(singleEvalResult?.data_stats?.median)"></div></div>
+                <div><div class="text-xs text-gray-400">非空率</div><div class="font-bold" x-text="fmtPct(1 - (singleEvalResult?.data_stats?.nan_ratio || 0))"></div></div>
+                <div><div class="text-xs text-gray-400">最小值</div><div class="font-bold" x-text="fmtNum(singleEvalResult?.data_stats?.min)"></div></div>
+                <div><div class="text-xs text-gray-400">最大值</div><div class="font-bold" x-text="fmtNum(singleEvalResult?.data_stats?.max)"></div></div>
+                <div><div class="text-xs text-gray-400">样本数</div><div class="font-bold" x-text="singleEvalResult?.data_stats?.count"></div></div>
+              </div>
+            </div>
+            <div class="bg-gray-50 rounded p-3">
+              <div class="text-xs font-semibold text-gray-600 mb-2">有效性评级</div>
+              <div class="grid grid-cols-4 gap-1 text-center">
+                <div class="bg-blue-50 rounded p-2">
+                  <div class="text-xs text-gray-500">IC强度</div>
+                  <div class="text-base font-bold text-blue-600" x-text="singleEvalResult?.effectiveness_grade?.ic_grade"></div>
+                </div>
+                <div class="bg-green-50 rounded p-2">
+                  <div class="text-xs text-gray-500">ICIR评级</div>
+                  <div class="text-base font-bold text-green-600" x-text="singleEvalResult?.effectiveness_grade?.icir_grade"></div>
+                </div>
+                <div class="bg-purple-50 rounded p-2">
+                  <div class="text-xs text-gray-500">PWC方向</div>
+                  <div class="text-base font-bold text-purple-600" x-text="singleEvalResult?.performance_with_cost?.direction === 1 ? '正向' : '反向'"></div>
+                </div>
+                <div class="bg-orange-50 rounded p-2">
+                  <div class="text-xs text-gray-500">IC胜率</div>
+                  <div class="text-base font-bold text-orange-600" x-text="fmtPct(singleEvalResult?.ic_timeseries?.ic_positive_ratio)"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2b. K线形态因子信号评价 (离散信号型, 不走IC/分层) -->
+          <div x-show="isSignalType(singleEvalResult?.factor_type)" class="grid grid-cols-2 gap-3">
+            <div class="bg-gray-50 rounded p-3">
+              <div class="text-xs font-semibold text-gray-600 mb-2">信号频率 (调仓
+                <span x-text="singleEvalResult?.pattern_evaluation?.rebal_period"></span>日)</div>
+              <div class="grid grid-cols-3 gap-1 text-center text-sm">
+                <div><div class="text-xs text-gray-400">有信号占比</div><div class="font-bold" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.signal_frequency?.signal_ratio)"></div></div>
+                <div><div class="text-xs text-gray-400">看涨占比</div><div class="font-bold text-red-600" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.signal_frequency?.bull_ratio)"></div></div>
+                <div><div class="text-xs text-gray-400">看跌占比</div><div class="font-bold text-green-600" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.signal_frequency?.bear_ratio)"></div></div>
+                <div><div class="text-xs text-gray-400">信号次数</div><div class="font-bold" x-text="singleEvalResult?.pattern_evaluation?.signal_frequency?.signal_count"></div></div>
+                <div><div class="text-xs text-gray-400">看涨次数</div><div class="font-bold" x-text="singleEvalResult?.pattern_evaluation?.signal_frequency?.bull_count"></div></div>
+                <div><div class="text-xs text-gray-400">看跌次数</div><div class="font-bold" x-text="singleEvalResult?.pattern_evaluation?.signal_frequency?.bear_count"></div></div>
+              </div>
+            </div>
+            <div class="bg-gray-50 rounded p-3">
+              <div class="text-xs font-semibold text-gray-600 mb-2">命中率</div>
+              <div class="grid grid-cols-3 gap-1 text-center text-sm">
+                <div><div class="text-xs text-gray-400">看涨命中</div><div class="font-bold text-red-600" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.hit_rate?.bull_hit_rate)"></div></div>
+                <div><div class="text-xs text-gray-400">看跌命中</div><div class="font-bold text-green-600" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.hit_rate?.bear_hit_rate)"></div></div>
+                <div><div class="text-xs text-gray-400">整体命中</div><div class="font-bold text-blue-600" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.hit_rate?.overall_hit_rate)"></div></div>
+              </div>
+            </div>
+            <div class="bg-gray-50 rounded p-3">
+              <div class="text-xs font-semibold text-gray-600 mb-2">条件收益 (未来N日均值)</div>
+              <div class="grid grid-cols-3 gap-1 text-center text-sm">
+                <div><div class="text-xs text-gray-400">有信号</div><div class="font-bold" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.conditional_return?.signal_return)"></div></div>
+                <div><div class="text-xs text-gray-400">无信号</div><div class="font-bold" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.conditional_return?.no_signal_return)"></div></div>
+                <div><div class="text-xs text-gray-400">信号收益差</div><div class="font-bold text-purple-600" x-text="fmtPct(singleEvalResult?.pattern_evaluation?.conditional_return?.signal_alpha)"></div></div>
+              </div>
+            </div>
+            <div class="bg-gray-50 rounded p-3">
+              <div class="text-xs font-semibold text-gray-600 mb-2">形态有效性评级</div>
+              <div class="text-center">
+                <span class="inline-block px-4 py-2 text-lg font-bold rounded bg-purple-50 text-purple-600"
+                      x-text="singleEvalResult?.effectiveness_grade?.pattern_grade"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 性能指标卡片 (技术/财务因子) -->
+          <div x-show="!isSignalType(singleEvalResult?.factor_type)" class="grid grid-cols-6 gap-2 text-center">
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-500">IC均值</div>
+              <div class="text-lg font-bold" :class="icColor(singleEvalResult?.ic_timeseries?.ic_mean)" x-text="fmtNum(singleEvalResult?.ic_timeseries?.ic_mean)"></div>
+            </div>
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-500">IC标准差</div>
+              <div class="text-lg font-bold" x-text="fmtNum(singleEvalResult?.ic_timeseries?.ic_std)"></div>
+            </div>
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-500">IR</div>
+              <div class="text-lg font-bold" :class="icColor(singleEvalResult?.ic_timeseries?.ir)" x-text="fmtNum(singleEvalResult?.ic_timeseries?.ir)"></div>
+            </div>
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-500">RankIC</div>
+              <div class="text-lg font-bold" :class="icColor(singleEvalResult?.ic_timeseries?.rank_ic_mean)" x-text="fmtNum(singleEvalResult?.ic_timeseries?.rank_ic_mean)"></div>
+            </div>
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-500">PWC夏普</div>
+              <div class="text-lg font-bold" :class="icColor(singleEvalResult?.performance_with_cost?.sharpe_ratio)" x-text="fmtNum(singleEvalResult?.performance_with_cost?.sharpe_ratio)"></div>
+            </div>
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-500">PWC年化</div>
+              <div class="text-lg font-bold" :class="icColor(singleEvalResult?.performance_with_cost?.annual_return)" x-text="fmtPct(singleEvalResult?.performance_with_cost?.annual_return)"></div>
+            </div>
+          </div>
+
+          <!-- 4. 可视化图表 -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-600 mb-1">IC 时序</div>
+              <div id="single-eval-ic-chart" style="height: 250px;"></div>
+            </div>
+            <div class="bg-gray-50 rounded p-2">
+              <div class="text-xs text-gray-600 mb-1">PWC 策略累计收益 (含交易成本)</div>
+              <div id="single-eval-pwc-chart" style="height: 250px;"></div>
+            </div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-600 mb-1">分层累计收益</div>
+            <div id="single-eval-layer-chart" style="height: 280px;"></div>
+          </div>
+
+          <!-- 5. AI分析 -->
+          <div class="bg-blue-50 rounded p-3">
+            <div class="flex justify-between items-center mb-2">
+              <div class="text-sm font-semibold text-blue-700">AI 助手分析</div>
+              <button @click="aiAnalyzeFactor()" :disabled="aiAnalyzing"
+                      class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                      x-text="aiAnalyzing ? '分析中...' : '让AI分析'"></button>
+            </div>
+            <div x-show="aiAnalyzing" class="text-center py-4 text-gray-400 text-sm">AI正在分析因子评价结果...</div>
+            <div x-show="aiAnalysisResult && !aiAnalyzing" class="text-sm text-gray-700 whitespace-pre-wrap bg-white rounded p-3" x-text="aiAnalysisResult"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ==================== 算子/基类参数配置弹窗 ==================== -->
+  <div x-show="showBldModal" x-cloak class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+       @click.self="closeBldParam()">
+    <div class="bg-white rounded-lg p-6 w-[480px] shadow-xl">
+      <h3 class="text-lg font-semibold mb-1" x-text="bldPending?.name"></h3>
+      <p class="text-xs text-gray-400 mb-4" x-text="bldPending?.desc"></p>
+      <div class="space-y-3">
+        <template x-for="(p, idx) in bldPending?.params || []" :key="idx">
+          <div>
+            <label class="text-xs text-gray-500" x-text="p.label"></label>
+            <template x-if="p.type === 'field'">
+              <input type="text" x-model="p.value" list="bld-fields-list"
+                     class="w-full px-3 py-1.5 text-sm border rounded font-mono"
+                     placeholder="选择字段或输入子表达式">
+            </template>
+            <template x-if="p.type === 'number'">
+              <input type="number" x-model="p.value" min="1"
+                     class="w-full px-3 py-1.5 text-sm border rounded">
+            </template>
+          </div>
+        </template>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="closeBldParam()" class="px-3 py-1.5 text-sm text-gray-600">取消</button>
+        <button @click="confirmBldParam()" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">插入</button>
+      </div>
+    </div>
+  </div>
+  <!-- 字段候选列表 -->
+  <datalist id="bld-fields-list">
+    <template x-for="field in fields" :key="'df_' + field.name">
+      <option :value="field.name" x-text="field.name + ' - ' + field.desc"></option>
+    </template>
+  </datalist>
+
+  <!-- ==================== 保存因子弹窗 ==================== -->
+  <div x-show="showSaveModal" x-cloak class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+       @click.self="showSaveModal = false">
+    <div class="bg-white rounded-lg p-6 w-[500px] shadow-xl">
+      <h3 class="text-lg font-semibold mb-4">加入因子库</h3>
+      <!-- 表达式预览 + 自动标签 -->
+      <div class="bg-gray-50 rounded p-3 mb-4">
+        <div class="text-xs text-gray-500 mb-1">因子表达式</div>
+        <div class="text-xs font-mono text-gray-700 bg-white rounded p-2 break-all" x-text="expression"></div>
+        <div class="mt-2 flex flex-wrap gap-2 text-xs">
+          <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded">基类: <span x-text="bldTags?.base_id || '—'"></span></span>
+          <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded">类型: <span x-text="bldTags?.factor_type || '—'"></span></span>
+          <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">方向: <span x-text="bldTags?.direction || '—'"></span></span>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-500">因子ID</label>
+          <input type="text" x-model="saveForm.factor_id" class="w-full px-3 py-1.5 text-sm border rounded" placeholder="如 my_factor_1">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">名称</label>
+          <input type="text" x-model="saveForm.name" class="w-full px-3 py-1.5 text-sm border rounded" placeholder="如 量价衰减因子">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-gray-500">分类</label>
+            <input type="text" x-model="saveForm.category" class="w-full px-3 py-1.5 text-sm border rounded" placeholder="如 composite">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">方向 (默认自动)</label>
+            <select x-model="saveForm.direction" class="w-full px-3 py-1.5 text-sm border rounded">
+              <option value="positive">正向(越大越好)</option>
+              <option value="negative">反向(越小越好)</option>
+              <option value="neutral">中性</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="text-xs text-gray-500">基类 (留空自动)</label>
+            <input type="text" x-model="saveForm.base_id" class="w-full px-2 py-1.5 text-xs border rounded font-mono" placeholder="自动解析">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">因子类型 (留空自动)</label>
+            <select x-model="saveForm.factor_type" class="w-full px-2 py-1.5 text-xs border rounded">
+              <option value="">自动解析</option>
+              <option value="technical">technical</option>
+              <option value="financial">financial</option>
+              <option value="signal">signal</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">评价方式 (留空自动)</label>
+            <select x-model="saveForm.evaluation_type" class="w-full px-2 py-1.5 text-xs border rounded">
+              <option value="">自动解析</option>
+              <option value="technical">technical</option>
+              <option value="technical_ts">technical_ts</option>
+              <option value="signal">signal</option>
+              <option value="financial">financial</option>
+              <option value="none">none</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">说明</label>
+          <textarea x-model="saveForm.description" rows="2" class="w-full px-3 py-1.5 text-sm border rounded"></textarea>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button @click="showSaveModal = false" class="px-3 py-1.5 text-sm text-gray-600">取消</button>
+        <button @click="saveFactor()" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">保存到因子库</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 消息提示 -->
+  <div x-show="toast" x-cloak x-transition
+       class="fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg z-50"
+       :class="toastType === 'error' ? 'bg-red-500' : 'bg-green-500'"
+       x-text="toast"></div>
+
+</div>
+

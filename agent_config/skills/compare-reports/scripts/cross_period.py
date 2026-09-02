@@ -29,7 +29,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_community.llms import Tongyi
 from langchain_community.vectorstores import FAISS
-from sector_rotation.rotation_core import execute_query
+from services.rotation.rotation_core import execute_query
 
 
 DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")

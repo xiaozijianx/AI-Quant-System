@@ -1,0 +1,449 @@
+    <div x-show="miningSubTab === 'gp'" class="space-y-2">
+      <!-- ===== 顶部工具条 (充实, 不空) ===== -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
+          <div class="flex items-center gap-2">
+            <h3 class="text-sm font-semibold text-gray-700">GP 自动生成</h3>
+            <span class="hidden sm:inline text-[11px] text-gray-400">遗传规划自动因子挖掘</span>
+          </div>
+
+          <!-- 股票池 -->
+          <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">股票池</label>
+            <div class="flex items-center gap-1.5">
+              <select x-model="poolType" @change="onPoolTypeChange()" class="w-36 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                <option value="active">成交活跃股(自动)</option>
+                <option value="industry">申万行业</option>
+                <option value="sector">板块</option>
+                <option value="concept">概念</option>
+                <option value="index">常见指数</option>
+                <option value="custom">自定义</option>
+              </select>
+              <template x-if="poolType !== 'active' && poolType !== 'custom'">
+                <select x-model="poolRef" class="w-44 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <option value="">请选择</option>
+                  <template x-for="opt in poolOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </template>
+              <template x-if="poolType === 'custom'">
+                <input type="text" x-model="poolRef" placeholder="逗号分隔代码, 如 600519.SH" class="w-44 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+              </template>
+              <template x-if="poolType === 'active'">
+                <input type="text" disabled value="自动选取成交活跃股" class="w-44 h-7 px-2 text-xs border border-gray-200 rounded-md bg-gray-50 text-gray-500">
+              </template>
+            </div>
+          </div>
+
+          <!-- 核心数量 -->
+          <div class="flex items-end gap-2">
+            <div>
+              <label class="block text-[11px] text-gray-500 mb-0.5">种群大小</label>
+              <input type="number" x-model.number="gpPopulation" min="20" max="200" class="w-20 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            </div>
+            <div>
+              <label class="block text-[11px] text-gray-500 mb-0.5">代数</label>
+              <input type="number" x-model.number="gpGenerations" min="3" max="50" class="w-20 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            </div>
+            <div>
+              <label class="block text-[11px] text-gray-500 mb-0.5">最大深度</label>
+              <input type="number" x-model.number="gpMaxDepth" min="2" max="6" class="w-16 h-7 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+            </div>
+          </div>
+
+          <div class="flex-1 flex justify-end items-center gap-3">
+            <span x-show="mining && gpProgress" class="text-xs text-blue-600">第 <b x-text="gpProgress?.gen"></b>/<b x-text="gpProgress?.generations"></b> 代 · 最优 <b x-text="fmtNum(gpProgress?.best_fitness)"></b></span>
+            <button @click="runGp()" :disabled="mining"
+                    :class="mining ? 'opacity-50 cursor-not-allowed' : ''"
+                    class="px-5 py-1.5 text-sm bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition-colors"
+                    x-text="mining ? '挖掘中...' : '运行 GP'"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 主体: 左结果 / 右参数 ===== -->
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_460px] gap-2.5 items-start">
+        <!-- 左: 结果区 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">GP 进化结果</h3>
+            <span class="text-[11px] text-gray-400">使用股票池: <span x-text="poolLabel()"></span></span>
+          </div>
+
+          <div x-show="gpResult || (mining && gpLiveCurve && gpLiveCurve.length)" class="space-y-2">
+            <div id="gp-evolution-chart" style="height: 300px;"></div>
+            <div class="text-xs text-gray-400" x-show="gpResult?.evolution_curve?.length">
+              进化: <span x-text="gpResult?.generations"></span> 代,
+              <span x-show="gpResult?.early_stopped" class="text-amber-600">· 已早停(实际 <b x-text="gpResult?.generations"></b>/<b x-text="gpResult?.requested_generations"></b> 代)</span>
+              训练最优: <span x-text="fmtNum(gpResult?.best_fitness)"></span>,
+              表达式: <span class="font-mono" x-text="gpResult?.best_expr"></span>
+            </div>
+            <!-- 数据集范围说明 -->
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500" x-show="gpResult?.train_range">
+              <span class="text-blue-600">训练集: <span x-text="gpResult?.train_range?.[0] + ' ~ ' + gpResult?.train_range?.[1]"></span></span>
+              <span x-show="gpResult?.val_range" class="text-amber-600">验证集: <span x-text="gpResult?.val_range?.[0] + ' ~ ' + gpResult?.val_range?.[1]"></span></span>
+              <span class="text-green-600">测试集: <span x-text="gpResult?.test_range?.[0] + ' ~ ' + gpResult?.test_range?.[1]"></span></span>
+            </div>
+          </div>
+
+          <div x-show="gpResult" class="space-y-2">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-2 py-1 text-left w-8"><input type="checkbox" @change="gpToggleAll($event.target.checked)"></th>
+                    <th class="px-2 py-1 text-left">表达式</th>
+                    <th class="px-2 py-1 text-center">评价方式</th>
+                    <th class="px-2 py-1 text-right">RankIC</th>
+                    <th class="px-2 py-1 text-right">ICIR</th>
+                    <th class="px-2 py-1 text-right">Test RankIC</th>
+                    <th class="px-2 py-1 text-right">分层多空</th>
+                    <th class="px-2 py-1 text-right">方向</th>
+                    <th class="px-2 py-1 text-center">OOS</th>
+                    <th class="px-2 py-1 text-center">WF</th>
+                    <th class="px-2 py-1 text-center">显著性</th>
+                    <th class="px-2 py-1 text-center">类型</th>
+                    <th class="px-2 py-1 text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(c, i) in (gpResult?.candidates || [])" :key="i">
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="px-2 py-1"><input type="checkbox" :checked="gpSelected.includes(i)" @change="gpToggle(i)"></td>
+                      <td class="px-2 py-1 font-mono text-xs max-w-[300px] truncate" :title="c.expr" x-text="c.expr"></td>
+                      <td class="px-2 py-1 text-center">
+                        <span class="px-1.5 py-0.5 rounded text-[10px]"
+                              :class="evalTypeStyle(gpExprEvalType(c.expr))"
+                              x-text="evalTypeText(gpExprEvalType(c.expr))"></span>
+                      </td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(gpMetric(c, 'rank_ic_mean'))"></td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(gpMetric(c, 'rank_ic_ir'))"></td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(c.test_rank_ic)"></td>
+                      <td class="px-2 py-1 text-right" x-text="fmtNum(gpMetric(c, 'long_short'))"></td>
+                      <td class="px-2 py-1 text-right" x-text="c.direction === -1 ? '反向' : '正向'"></td>
+                      <td class="px-2 py-1 text-center">
+                        <span x-show="c.oos_ok" class="text-green-600 text-xs">OK</span>
+                        <span x-show="!c.oos_ok" class="text-red-400 text-xs">FAIL</span>
+                      </td>
+                      <td class="px-2 py-1 text-center">
+                        <span x-show="c.wf_ok === true" class="text-green-600 text-xs" :title="'WF平均IC: ' + fmtNum(c.wf_mean_ic) + ', 通过率: ' + fmtNum(c.wf_pass_ratio)">OK</span>
+                        <span x-show="c.wf_ok === false" class="text-red-400 text-xs" :title="'WF平均IC: ' + fmtNum(c.wf_mean_ic) + ', 通过率: ' + fmtNum(c.wf_pass_ratio)">FAIL</span>
+                        <span x-show="c.wf_ok === null" class="text-gray-300 text-xs">-</span>
+                      </td>
+                      <td class="px-2 py-1 text-center">
+                        <span x-show="c.perm_significant === true" class="text-green-600 text-xs" :title="'p值: ' + fmtNum(c.perm_p_value) + ', 空分布均值: ' + fmtNum(c.perm_null_mean)">显著</span>
+                        <span x-show="c.perm_significant === false" class="text-orange-400 text-xs" :title="'p值: ' + fmtNum(c.perm_p_value) + ', 空分布均值: ' + fmtNum(c.perm_null_mean)">不显著</span>
+                        <span x-show="c.perm_significant === null || c.perm_significant === undefined" class="text-gray-300 text-xs">-</span>
+                      </td>
+                      <td class="px-2 py-1 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                          <span :class="c.chosen_type === 'technical_ts' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
+                                class="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                x-text="c.chosen_type === 'technical_ts' ? 'TS' : '技术'"></span>
+                          <button @click="gpToggleType(c)" title="切换 technical / technical_ts 口径"
+                                  class="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded hover:bg-gray-50"
+                                  x-text="c.chosen_type === 'technical_ts' ? '→技' : '→TS'"></button>
+                        </div>
+                      </td>
+                      <td class="px-2 py-1 text-center">
+                        <button @click="gpSaveFactor(c)" class="text-blue-600 hover:underline text-xs">入库</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex justify-between items-center pt-2">
+              <span class="text-xs text-gray-500" x-text="`已选 ${gpSelected.length} 个候选`"></span>
+              <div class="flex items-center gap-2">
+                <button @click="gpBatchSaveAndSynth()" :disabled="gpSelected.length === 0"
+                        class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">批量入库并进多因子</button>
+                <button @click="gpBatchSave()" :disabled="gpSelected.length === 0"
+                        class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">批量入库</button>
+              </div>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1">阶段5.2 因子组合优化衔接: "批量入库并进多因子"在入库后自动带入多因子分析页(切Tab + 数据准备), 可在该页继续②合成评价/保存因子包。</div>
+
+            <div x-show="gpResult?.dedup_report?.enabled" class="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-500">
+              <template x-if="!gpResult?.dedup_report?.ortho_mode">
+                <div>去冗余: 阈值 |corr|&gt;<span x-text="gpResult?.dedup_report?.corr_thresh"></span>, 保留 <span x-text="gpResult?.dedup_report?.kept_n"></span> 个, 剔除 <span x-text="gpResult?.dedup_report?.removed_n"></span> 个高度相关候选</div>
+              </template>
+              <template x-if="gpResult?.dedup_report?.ortho_mode">
+                <div>残差正交化模式: 增量IC阈值&gt;<span x-text="gpResult?.dedup_report?.min_incremental_ic"></span>, 保留 <span x-text="gpResult?.dedup_report?.kept_n"></span> 个, 剔除 <span x-text="gpResult?.dedup_report?.removed_n"></span> 个</div>
+              </template>
+              <template x-if="(gpResult?.dedup_report?.removed || []).length > 0">
+                <div class="mt-1 max-h-24 overflow-y-auto">
+                  <template x-for="(r, ri) in (gpResult?.dedup_report?.removed || []).slice(0, 10)" :key="ri">
+                    <div class="truncate">
+                      <span x-show="r.reason === 'low_incremental_ic'">
+                        剔除 <span class="font-mono" x-text="r.expr"></span>
+                        (增量IC=<span x-text="r.incremental_ic"></span> &lt; 阈值, 池大小=<span x-text="r.ortho_pool_size"></span>)
+                      </span>
+                      <span x-show="r.reason !== 'low_incremental_ic'">
+                        剔除 <span class="font-mono" x-text="r.expr"></span>
+                        (与 <span class="font-mono" x-text="r.corr_with"></span> corr=<span x-text="r.corr"></span>)
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右: 参数面板 (分组小卡片, 控制样式统一) -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3 lg:sticky lg:top-2">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">GP 参数配置</h3>
+            <span class="text-[10px] text-gray-400">悬停查看参数说明</span>
+          </div>
+          <div class="space-y-2">
+
+            <!-- 训练与数据 -->
+            <div class="rounded-lg border border-gray-100 p-2">
+              <div class="text-[11px] font-medium text-gray-500 mb-1">训练与数据</div>
+              <div class="grid grid-cols-4 gap-x-2">
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">训练比例</label>
+                  <input type="number" x-model.number="gpTrainRatio" min="0.5" max="0.9" step="0.05" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">用于训练段的样本比例，剩余分给验证/测试段。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">验证比例</label>
+                  <input type="number" x-model.number="gpValRatio" min="0" max="0.3" step="0.05" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">验证段占比；0 表示只分训练/测试两段。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">持有期(日)</label>
+                  <input type="number" x-model.number="gpRebalPeriod" min="3" max="63" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">未来收益的调仓周期（日），对齐截面 RankIC 计算。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">TS标准窗口</label>
+                  <input type="number" x-model.number="gpTsNormWindow" min="0" max="500" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">时序滚动分位标准化窗口；0=不启用 TS 标准化。</div>
+                </div>
+              </div>
+              <div class="mt-1 grid grid-cols-2 gap-x-2">
+                <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                  TS标准化(仅 technical_ts)
+                  <input type="checkbox" x-model="gpUseTsNorm" class="h-4 w-4 rounded accent-blue-600">
+                  <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">勾选 = 仅对判定为 technical_ts（价格水平/累积量纲/绝对波动）的候选先做历史滚动分位；technical 直接截面，不误伤其信号。未勾选则全部按 technical 处理。</span>
+                </label>
+                <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                  启用GPU加速
+                  <input type="checkbox" x-model="gpUseGpu" class="h-4 w-4 rounded accent-blue-600">
+                  <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">整树 GPU 张量求值（主循环+OOS/WF），需 CUDA 可用。</span>
+                </label>
+              </div>
+              <div class="mt-1 grid grid-cols-2 gap-x-2">
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">样本比例</label>
+                  <input type="number" x-model.number="gpMaxSamples" min="0.1" max="1" step="0.1" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">按比例抽样股票加速搜索；1=全量（不降采样）。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">并行进程数</label>
+                  <input type="number" x-model.number="gpNJobs" min="1" max="16" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">同时开启的进化进程数；1=串行，&gt;1 多进程并行加速。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 搜索空间与目标 -->
+            <div class="rounded-lg border border-gray-100 p-2">
+              <div class="text-[11px] font-medium text-gray-500 mb-1">搜索空间与目标</div>
+              <div class="grid grid-cols-2 gap-x-2">
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">搜索空间</label>
+                  <select x-model="gpSpaceLevel" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <option value="L0">L0 基础算子+字段</option>
+                    <option value="L1">L1 新时序算子</option>
+                    <option value="L2">L2 算子+基类</option>
+                  </select>
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">算子/字段搜索级别：L0 精简、L1 加新时序算子、L2 再加基类。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">适应度目标</label>
+                  <select x-model="gpFitnessMode" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <option value="rank_ic">rank_ic (RankIC)</option>
+                    <option value="rank_icir">rank_icir (IC/ICstd)</option>
+                    <option value="long_short_sharpe">long_short_sharpe</option>
+                  </select>
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">进化打分指标：RankIC均值 / IC均值比标准差 / 多空组合夏普。</div>
+                </div>
+              </div>
+              <div class="mt-1 grid grid-cols-2 gap-x-2">
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">多样性奖励</label>
+                  <input type="number" x-model.number="gpDiversityWeight" min="0" max="0.2" step="0.005" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">种群多样性的奖励权重，越大越鼓励探索新结构。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">显著性检验次数</label>
+                  <input type="number" x-model.number="gpPermN" min="0" max="1000" step="50" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">permutation 置换显著性检验次数；0=关闭。</div>
+                </div>
+              </div>
+              <label class="relative mt-1 flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                Warm-Start 基因初始化
+                <input type="checkbox" x-model="gpUseWarmStart" class="h-4 w-4 rounded accent-blue-600">
+                <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">用库内/上次的好公式基因做初始种群，加速收敛。</span>
+              </label>
+            </div>
+
+            <!-- 遗传算子 -->
+            <div class="rounded-lg border border-gray-100 p-2">
+              <div class="text-[11px] font-medium text-gray-500 mb-1">遗传算子</div>
+              <div class="grid grid-cols-5 gap-x-1.5">
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">锦标赛</label>
+                  <input type="number" x-model.number="gpTournamentSize" min="2" max="20" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">锦标赛参赛个体数，越大选择压力越大。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">交叉</label>
+                  <input type="number" x-model.number="gpPCrossover" min="0.5" max="1.0" step="0.05" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">子树交叉概率。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">子树变异</label>
+                  <input type="number" x-model.number="gpPSubtreeMut" min="0" max="0.1" step="0.005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">随机替换某个子树结构的概率。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">点变异</label>
+                  <input type="number" x-model.number="gpPPointMut" min="0" max="0.1" step="0.005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">单个节点算符/字段突变的概率。</div>
+                </div>
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">复杂度惩罚</label>
+                  <input type="number" x-model.number="gpParsimony" min="0" max="0.01" step="0.0005" class="h-7 w-full px-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">公式越复杂扣分越多，抑制过度膨胀/过拟合。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 筛选与去冗余 -->
+            <div class="rounded-lg border border-gray-100 p-2">
+              <div class="text-[11px] font-medium text-gray-500 mb-1">筛选与去冗余</div>
+              <div class="space-y-1">
+                <div class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">去冗余阈值</label>
+                  <input type="number" x-model.number="gpCorrThresh" min="0" max="1" step="0.05" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="flex items-center gap-1 mt-0.5 text-[10px] text-gray-400">
+                    <span>|corr|&gt;阈值剔除低IC</span>
+                    <button @click="gpCorrThresh = 0.7" :class="gpCorrThresh === 0.7 ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'" class="px-1.5 py-0.5 rounded shadow-sm">0.7更严</button>
+                    <button @click="gpCorrThresh = 0.8" :class="gpCorrThresh === 0.8 ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'" class="px-1.5 py-0.5 rounded shadow-sm">0.8标准</button>
+                  </div>
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-60 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">候选与已选因子 |相关| 高于此阈值时，剔除低 IC 的那一个；0.7 更严 / 0.8 标准。</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-2">
+                  <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                    过滤裸字段
+                    <input type="checkbox" x-model="gpFilterBare" class="h-4 w-4 rounded accent-blue-600">
+                    <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">剔除只含单个裸字段（无算子加工）的无效公式。</span>
+                  </label>
+                  <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                    残差正交化
+                    <input type="checkbox" x-model="gpOrthogonalize" class="h-4 w-4 rounded accent-blue-600">
+                    <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">用增量 IC 逐条正交化去冗余，替代固定阈值法。</span>
+                  </label>
+                </div>
+                <div x-show="gpOrthogonalize" class="relative group">
+                  <label class="block text-[11px] text-gray-500 mb-0.5">增量IC阈值</label>
+                  <input type="number" x-model.number="gpMinIncrementalIc" min="0" max="0.1" step="0.005" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">正交化后要求新增贡献的 IC 下限，低于则剔除。</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 中性化 -->
+            <div class="rounded-lg border border-gray-100 p-2">
+              <div class="text-[11px] font-medium text-gray-500 mb-1">中性化</div>
+              <div class="grid grid-cols-2 gap-x-2">
+                <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                  市值中性化
+                  <input type="checkbox" x-model="gpMarketcapNeutralize" class="h-4 w-4 rounded accent-blue-600">
+                  <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">对因子做市值中性化，消除市值风格暴露。</span>
+                </label>
+                <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                  风格中性化
+                  <input type="checkbox" x-model="gpNeutralizeStyles" class="h-4 w-4 rounded accent-blue-600">
+                  <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">行业+收益+换手+波动多列回归取残差（需 GPU，隐含市值列）。</span>
+                </label>
+              </div>
+              <div x-show="gpNeutralizeStyles" class="mt-1 space-y-1">
+                <div class="grid grid-cols-2 gap-x-2">
+                  <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                    行业哑变量
+                    <input type="checkbox" x-model="gpStyleUseIndustry" class="h-4 w-4 rounded accent-blue-600">
+                    <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">风格回归是否包含行业哑变量列。</span>
+                  </label>
+                  <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                    换手率
+                    <input type="checkbox" x-model="gpStyleUseTurnover" class="h-4 w-4 rounded accent-blue-600">
+                    <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">风格回归是否包含换手率列。</span>
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-x-2">
+                  <div class="relative group">
+                    <label class="block text-[11px] text-gray-500 mb-0.5">过去收益窗口</label>
+                    <input type="number" x-model.number="gpStyleRetWindow" min="5" max="120" step="5" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">风格回归中“过去收益”特征的回看窗口。</div>
+                  </div>
+                  <div class="relative group">
+                    <label class="block text-[11px] text-gray-500 mb-0.5">波动窗口</label>
+                    <input type="number" x-model.number="gpStyleVolWindow" min="5" max="120" step="5" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">风格回归中“波动”特征的回看窗口。</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 进阶选项 (折叠) -->
+            <div class="rounded-lg border border-gray-100 p-2">
+              <button @click="gpShowAdvanced = !gpShowAdvanced"
+                      class="w-full flex items-center justify-between text-[11px] font-medium text-gray-500"
+                      x-text="gpShowAdvanced ? '进阶选项 (收起 ▲)' : '进阶选项 (展开 ▼)'"></button>
+              <div x-show="gpShowAdvanced" class="mt-1 space-y-1">
+                <div class="relative group">
+                  <div class="flex items-center justify-between">
+                    <label class="text-[11px] text-gray-500">早停耐心代数</label>
+                    <span class="text-[10px] text-gray-400">0=关闭</span>
+                  </div>
+                  <input type="number" x-model.number="gpEarlyStopGens" min="0" max="100" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">连续多少代无改善就提前停止（默认 5）；0=关闭早停，跑满代数。</div>
+                </div>
+                <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                  PCA-QD多样性
+                  <input type="checkbox" x-model="gpPcaQd" class="h-4 w-4 rounded accent-blue-600">
+                  <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">PCA 特征空间新奇性搜索（替代 Jaccard），需 GPU。</span>
+                </label>
+                <div>
+                  <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                    Replacement防早熟
+                    <input type="checkbox" x-model="gpReplacement" class="h-4 w-4 rounded accent-blue-600">
+                    <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">用变异再生的个体替换同质新生个体，抑制早熟。</span>
+                  </label>
+                  <div x-show="gpReplacement" class="relative group">
+                    <label class="block text-[11px] text-gray-500 mb-0.5">同质阈值</label>
+                    <input type="number" x-model.number="gpReplacementThresh" min="0.5" max="0.99" step="0.05" class="h-7 w-full px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <div class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-48 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">判定“同质”的相似度阈值。</div>
+                  </div>
+                </div>
+                <label class="relative flex items-center justify-between text-[11px] text-gray-600 py-0.5 group">
+                  Hierarchical 分层
+                  <input type="checkbox" x-model="gpHierarchical" class="h-4 w-4 rounded accent-blue-600">
+                  <span class="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-52 rounded-md bg-gray-800 text-[11px] text-white p-2 leading-snug shadow-lg group-hover:block">粗搜(L0)→细搜(扩算子)两阶段，粗搜候选作细搜基因。</span>
+                </label>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== QuantGP 复刻 (内嵌于因子挖掘子页面, 与 GP 挖掘并列; 完全复刻 QuantGplearn 原版) ==================== -->

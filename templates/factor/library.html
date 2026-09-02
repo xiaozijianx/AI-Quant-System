@@ -1,0 +1,167 @@
+  <!-- ==================== Tab 1: 因子库 ==================== -->
+  <div x-show="activeTab === 'library'" class="space-y-4">
+    <!-- 筛选栏 -->
+    <div class="flex flex-wrap gap-3 items-center bg-white rounded-lg p-3 shadow-sm">
+      <select x-model="filterCategory" @change="loadFactors()" class="px-3 py-1.5 text-sm border rounded">
+        <option value="">全部分类</option>
+        <template x-for="cat in categories" :key="cat">
+          <option :value="cat" x-text="cat"></option>
+        </template>
+      </select>
+      <select x-model="filterOriginType" @change="loadFactors()" class="px-3 py-1.5 text-sm border rounded">
+        <option value="">全部因子类型</option>
+        <option value="basic">基础因子</option>
+        <option value="composite">复合因子</option>
+      </select>
+      <select x-model="filterEvalType" class="px-3 py-1.5 text-sm border rounded">
+        <option value="">全部评价方式</option>
+        <option value="technical">技术(截面)</option>
+        <option value="technical_ts">时序标准化</option>
+        <option value="signal">事件信号</option>
+        <option value="financial">财务</option>
+        <option value="none">不可评价</option>
+      </select>
+      <!-- 基类可搜索下拉 -->
+      <div class="relative" @click.outside="baseDropdownOpen = false">
+        <button @click="baseDropdownOpen = !baseDropdownOpen"
+                class="px-3 py-1.5 text-sm border rounded flex items-center gap-1 min-w-[140px]"
+                :class="baseFilter ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white text-gray-600'">
+          <span x-text="baseFilter ? baseLabel(baseFilter) : '全部基类'"></span>
+          <span x-show="baseFilter" class="text-xs opacity-60" x-text="'(' + baseCount(baseFilter) + ')'"></span>
+          <svg class="w-3 h-3 ml-auto opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <!-- 下拉面板 -->
+        <div x-show="baseDropdownOpen" x-transition
+             class="absolute z-30 mt-1 bg-white border rounded-lg shadow-lg w-72">
+          <div class="p-2 border-b">
+            <input type="text" x-model="baseSearch" placeholder="搜索基类名称..."
+                   class="w-full px-2 py-1 text-sm border rounded" @click.stop>
+          </div>
+          <div class="max-h-72 overflow-y-auto">
+            <button @click="baseFilter=''; baseDropdownOpen=false"
+                    class="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 text-gray-500">
+              全部基类 (<span x-text="contextFactors.length"></span>)
+            </button>
+            <template x-for="b in filteredBases" :key="b.base_id">
+              <button @click="toggleBase(b.base_id); baseDropdownOpen=false"
+                      class="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 flex items-center justify-between"
+                      :class="baseFilter===b.base_id ? 'bg-blue-50 text-blue-700' : ''">
+                <span x-text="b.name"></span>
+                <span class="text-xs text-gray-400" x-text="baseCount(b.base_id)"></span>
+              </button>
+            </template>
+            <div x-show="filteredBases.length === 0" class="px-3 py-4 text-center text-xs text-gray-400">
+              未找到匹配的基类
+            </div>
+          </div>
+          <div class="px-3 py-1.5 border-t text-xs text-gray-400 text-center" x-text="'共 ' + bases.length + ' 个基类'"></div>
+        </div>
+      </div>
+      <input type="text" x-model="searchText" @input.debounce.300ms="loadFactors()"
+             placeholder="搜索因子名称/公式/来源..." class="px-3 py-1.5 text-sm border rounded flex-1 min-w-[200px]">
+      <label class="flex items-center gap-1 text-sm">
+        <input type="checkbox" x-model="customOnly" @change="loadFactors()"> 仅自定义
+      </label>
+      <label class="flex items-center gap-1 text-sm">
+        <input type="checkbox" x-model="evaluableOnly" @change="loadFactors()"> 仅可评估
+      </label>
+    </div>
+
+    <!-- 已选中因子标签区 (搜索栏下方, 因子表格上方) -->
+    <div x-show="selectedFactors.length > 0" class="bg-blue-50 rounded-lg p-2">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs text-blue-700" x-text="'已选中 ' + selectedFactors.length + ' 个因子'"></span>
+        <div class="flex items-center gap-2">
+          <button @click="activeTab = 'multifactor'" class="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">多因子分析</button>
+          <button @click="selectedFactors = []" class="text-xs text-blue-600 hover:underline">全部清除</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <template x-for="info in selectedFactorInfos" :key="info.factor_id">
+          <span class="inline-flex items-center gap-1.5 bg-white border border-blue-200 rounded px-2 py-0.5 text-xs max-w-[240px]">
+            <span class="font-mono text-blue-700 truncate" x-text="info.factor_id"></span>
+            <span class="text-gray-400 truncate" x-text="info.name"></span>
+            <button @click.stop="toggleRowSelect(info.factor_id)" class="text-gray-400 hover:text-red-500 text-xs leading-none">×</button>
+          </span>
+        </template>
+      </div>
+    </div>
+
+    <!-- 因子表格 -->
+    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600">
+            <tr>
+              <th class="px-3 py-2 text-left"><input type="checkbox" @change="toggleAll($event)"></th>
+              <th class="px-3 py-2 text-left">因子ID</th>
+              <th class="px-3 py-2 text-left">名称</th>
+              <th class="px-3 py-2 text-left">分类</th>
+              <th class="px-3 py-2 text-left">方向</th>
+              <th class="px-3 py-2 text-left">因子类型</th>
+              <th class="px-3 py-2 text-left">评价方式</th>
+              <th class="px-3 py-2 text-left">基类</th>
+              <th class="px-3 py-2 text-left">来源(CASE)</th>
+              <th class="px-3 py-2 text-right">IC</th>
+              <th class="px-3 py-2 text-right">IR</th>
+              <th class="px-3 py-2 text-right">多空收益</th>
+              <th class="px-3 py-2 text-left">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="f in filteredFactors" :key="f.factor_id">
+              <tr class="hover:bg-gray-50 cursor-pointer" @click="toggleRowSelect(f.factor_id)">
+                <td class="px-3 py-2"><input type="checkbox" :value="f.factor_id" x-model="selectedFactors" @click.stop></td>
+                <td class="px-3 py-2 font-mono text-xs" x-text="f.factor_id"></td>
+                <td class="px-3 py-2" x-text="f.name"></td>
+                <td class="px-3 py-2">
+                  <span class="px-2 py-0.5 text-xs rounded bg-blue-50 text-blue-600" x-text="f.category"></span>
+                </td>
+                <td class="px-3 py-2">
+                  <span :class="directionColor(f.direction)" class="text-xs" x-text="directionText(f.direction)"></span>
+                </td>
+                <td class="px-3 py-2">
+                  <span class="px-2 py-0.5 text-xs rounded"
+                        :class="originTypeStyle(f)"
+                        x-text="originTypeText(f)"></span>
+                </td>
+                <td class="px-3 py-2">
+                  <span class="px-2 py-0.5 text-xs rounded"
+                        :class="evalTypeStyle(factorEvalType(f))"
+                        :title="factorEvalType(f) === (f.evaluation_type||'').trim().toLowerCase() ? '手工维护的评价方式' : '自动推断(可在详情中修改)'"
+                        x-text="evalTypeText(factorEvalType(f))"></span>
+                </td>
+                <td class="px-3 py-2 text-xs text-gray-500">
+                  <span x-show="f.base_id" x-text="f.base_name || f.base_id"></span>
+                  <span x-show="!f.base_id" class="text-gray-300">-</span>
+                </td>
+                <td class="px-3 py-2 text-xs text-gray-500" x-text="f.origin || '-'"></td>
+                <td class="px-3 py-2 text-right font-mono" :class="icColor(f.ic_mean)" x-text="fmtNum(f.ic_mean)"></td>
+                <td class="px-3 py-2 text-right font-mono" :class="icColor(f.ir)" x-text="fmtNum(f.ir)"></td>
+                <td class="px-3 py-2 text-right font-mono" :class="icColor(f.long_short_return)" x-text="fmtPct(f.long_short_return)"></td>
+                <td class="px-3 py-2 flex gap-1">
+                  <button @click.stop="showDetail(f.factor_id)" class="text-blue-600 hover:underline text-xs">详情</button>
+                  <button @click.stop="gotoEvaluate(f.factor_id)" class="text-green-600 hover:underline text-xs" x-show="isEvaluable(f.factor_id)">评估</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="filteredFactors.length === 0">
+              <td colspan="13" class="px-3 py-8 text-center text-gray-400">
+                <span x-show="!initializing">暂无因子数据，请点击右上角「初始化因子库」</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 已选因子操作栏 -->
+    <div x-show="selectedFactors.length > 0" class="flex items-center gap-3 bg-blue-50 rounded-lg p-3">
+      <span class="text-sm text-blue-700" x-text="'已选 ' + selectedFactors.length + ' 个因子'"></span>
+      <button @click="activeTab = 'evaluate'" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">
+        去评价
+      </button>
+      <button @click="selectedFactors = []" class="px-3 py-1 text-sm text-gray-500 hover:text-gray-700">清除</button>
+    </div>
+  </div>
+

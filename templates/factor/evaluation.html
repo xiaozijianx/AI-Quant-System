@@ -1,0 +1,335 @@
+  <!-- ==================== Tab 4: 因子评价 ==================== -->
+  <div x-show="activeTab === 'evaluate'" class="space-y-4">
+    <div class="bg-white rounded-lg p-4 shadow-sm">
+      <div class="grid grid-cols-6 gap-3 mb-4">
+        <div>
+          <label class="text-xs text-gray-500">开始日期</label>
+          <input type="date" x-model="startDate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">结束日期</label>
+          <input type="date" x-model="endDate" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">分层数</label>
+          <input type="number" x-model.number="nLayers" min="3" max="20" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">调仓周期(日)</label>
+          <input type="number" x-model.number="rebalPeriod" min="5" max="60" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">分组中性化</label>
+          <select x-model="neutralizeGroup" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="none">无</option>
+            <option value="sector">板块(申万二级)</option>
+            <option value="concept">概念</option>
+            <option value="industry">行业(申万一级)</option>
+          </select>
+        </div>
+        <div class="flex items-end gap-3">
+          <button @click="runEvaluate()" :disabled="evaluating"
+                  class="px-4 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                  x-text="evaluating ? '评价中...' : '运行评价'"></button>
+          <label class="flex items-center gap-1 text-xs text-gray-500 pb-1.5">
+            <input type="checkbox" x-model="neutralizeMc" class="w-3.5 h-3.5">市值中性化
+          </label>
+        </div>
+      </div>
+      <!-- 时序标准化窗口 (仅当前因子为 technical_ts 时显示) -->
+      <div x-show="currentFactorEvalType() === 'technical_ts'" class="mb-2 flex items-center gap-2 bg-cyan-50 rounded p-2">
+        <span class="text-xs text-cyan-700 font-medium">时序标准化窗口(交易日):</span>
+        <input type="number" x-model.number="tsNormWindow" min="60" max="500" class="w-20 px-2 py-1 text-xs border rounded bg-white">
+        <span class="text-xs text-gray-400">量纲不可比因子(价格水平/累积量纲/绝对波动)先对自身近N日历史做滚动分位, 再走截面IC/分层管线; 窗口越大预热期越长</span>
+      </div>
+      <!-- 股票池选择: 多种推荐 + 自定义 -->
+      <div class="grid grid-cols-6 gap-3 mb-2">
+        <div>
+          <label class="text-xs text-gray-500">股票池类型</label>
+          <select x-model="poolType" @change="onPoolTypeChange()" class="w-full px-2 py-1 text-sm border rounded">
+            <template x-for="pt in stockPools.pool_types || []" :key="pt.pool_type">
+              <option :value="pt.pool_type" x-text="pt.label"></option>
+            </template>
+          </select>
+        </div>
+        <div x-show="poolType === 'industry'" class="col-span-2">
+          <label class="text-xs text-gray-500">选择行业</label>
+          <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="">请选择行业</option>
+            <template x-for="ind in stockPools.industries || []" :key="ind.ref">
+              <option :value="ind.ref" x-text="ind.ref + ' (' + ind.count + '只)'"></option>
+            </template>
+          </select>
+        </div>
+        <div x-show="poolType === 'sector'" class="col-span-2">
+          <label class="text-xs text-gray-500">选择板块</label>
+          <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="">请选择板块</option>
+            <template x-for="s in stockPools.sectors || []" :key="s.ref">
+              <option :value="s.ref" x-text="s.ref + ' (' + s.count + '只)'"></option>
+            </template>
+          </select>
+        </div>
+        <div x-show="poolType === 'concept'" class="col-span-2">
+          <label class="text-xs text-gray-500">选择概念</label>
+          <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="">请选择概念</option>
+            <template x-for="c in stockPools.concepts || []" :key="c.ref">
+              <option :value="c.ref" x-text="c.ref + ' (' + c.count + '只)'"></option>
+            </template>
+          </select>
+        </div>
+        <div x-show="poolType === 'index'" class="col-span-2">
+          <label class="text-xs text-gray-500">选择指数</label>
+          <select x-model="poolRef" class="w-full px-2 py-1 text-sm border rounded">
+            <option value="">请选择指数</option>
+            <template x-for="ix in stockPools.indexes || []" :key="ix.ref">
+              <option :value="ix.ref" x-text="ix.label"></option>
+            </template>
+          </select>
+        </div>
+        <div x-show="poolType === 'custom'" class="col-span-5">
+          <label class="text-xs text-gray-500">自定义代码(逗号分隔)</label>
+          <input type="text" x-model="poolRef" placeholder="如 600519.SH,000001.SZ" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+        <div x-show="poolType === 'single'" class="col-span-2">
+          <label class="text-xs text-gray-500">单股代码(时间序列IC)</label>
+          <input type="text" x-model="poolRef" placeholder="如 600519.SH" class="w-full px-2 py-1 text-sm border rounded">
+        </div>
+      </div>
+      <div class="text-xs text-gray-400 mb-2">
+        评价因子: <span x-text="selectedFactors.join(', ') || '未选择(默认全部基础因子)'"></span> |
+        股票池: <span x-text="poolLabel()"></span>
+      </div>
+    </div>
+
+    <div x-show="evalResult" class="grid grid-cols-2 gap-4">
+      <!-- 一键AI分析: 将评价结果+含义填入右侧AI助手输入框 -->
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm flex items-center justify-between">
+        <div class="text-sm text-gray-700">
+          <span class="font-semibold" x-text="evalResult?.factor_info?.name || evalResult?.factor_id"></span>
+          <span class="text-xs text-gray-400 font-mono ml-1" x-text="evalResult?.factor_id"></span>
+          <span class="text-xs text-gray-400 ml-2">评价完成, 可一键交给 AI 助手解读</span>
+          <span class="text-xs text-amber-600 ml-2"
+                x-show="evalResult?.rebal_period_used && evalResult?.factor_type === 'financial'"
+                x-text="'实际调仓周期: ' + evalResult.rebal_period_used + ' 日(财务因子按财报期对齐)'"></span>
+          <span class="text-xs text-purple-600 ml-2"
+                x-show="evalResult?.factor_type === 'financial' && evalResult?.financial_quality"
+                x-text="'中位数填充占比: ' + fmtPct(evalResult?.financial_quality?.fill_ratio) + ' | 财报调仓点: ' + (evalResult?.financial_quality?.n_report_dates || 0)"></span>
+          <span class="px-1.5 py-0.5 text-xs rounded bg-cyan-50 text-cyan-600 ml-2"
+                x-show="evalResult?.factor_type === 'technical_ts'"
+                x-text="'时序分位化后截面评价 (窗口' + (evalResult?.ts_normalize_window || 250) + '日)'"></span>
+          <span class="px-1.5 py-0.5 text-xs rounded bg-blue-50 text-blue-600 ml-2"
+                x-show="evalResult?.factor_type === 'single' && evalResult?.single_pipeline_type"
+                x-text="'单股' + (evalResult.single_pipeline_type === 'signal' ? '事件信号评价' : '时序IC评价(' + evalResult.single_pipeline_type + ')')"></span>
+        </div>
+        <button @click="sendEvalToAi()" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          一键 AI 分析
+        </button>
+      </div>
+      <!-- 单股模式: 按管线类型展示 (时序IC / 事件信号; 结构差异=无截面, 路由与多股同类型同口径) -->
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm" x-show="evalResult?.factor_type === 'single'">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-gray-700"
+              x-text="evalResult?.single_pipeline_type === 'signal' ? '单股事件信号评价' : '单股时间序列IC评价'"></h3>
+          <span class="text-xs text-gray-400" x-text="'股票: ' + evalResult?.stock_code + (evalResult?.single_pipeline_type === 'signal' ? '' : ' | IC样本点数: ' + evalResult?.single_ic?.samples)"></span>
+        </div>
+        <!-- 单股 signal: 事件信号评价 (命中率/条件收益) -->
+        <template x-if="evalResult?.single_pipeline_type === 'signal'">
+          <div>
+            <div class="grid grid-cols-4 gap-2 text-center mb-2">
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有信号占比</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.pattern_evaluation?.signal_frequency?.signal_ratio)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">看涨占比</div><div class="text-lg font-bold text-red-600" x-text="fmtPct(evalResult?.pattern_evaluation?.signal_frequency?.bull_ratio)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">看跌占比</div><div class="text-lg font-bold text-green-600" x-text="fmtPct(evalResult?.pattern_evaluation?.signal_frequency?.bear_ratio)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">信号次数</div><div class="text-lg font-bold" x-text="evalResult?.pattern_evaluation?.signal_frequency?.signal_count"></div></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center mb-2">
+              <div class="bg-blue-50 rounded p-2"><div class="text-xs text-gray-500">看涨命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(evalResult?.pattern_evaluation?.hit_rate?.bull_hit_rate)"></div></div>
+              <div class="bg-blue-50 rounded p-2"><div class="text-xs text-gray-500">看跌命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(evalResult?.pattern_evaluation?.hit_rate?.bear_hit_rate)"></div></div>
+              <div class="bg-blue-50 rounded p-2"><div class="text-xs text-gray-500">整体命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(evalResult?.pattern_evaluation?.hit_rate?.overall_hit_rate)"></div></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有信号收益</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.pattern_evaluation?.conditional_return?.signal_return)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">无信号收益</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.pattern_evaluation?.conditional_return?.no_signal_return)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">信号收益差</div><div class="text-lg font-bold text-purple-600" x-text="fmtPct(evalResult?.pattern_evaluation?.conditional_return?.signal_alpha)"></div></div>
+            </div>
+            <div class="mt-2 text-xs text-gray-500">
+              形态评级: <span class="font-bold" x-text="evalResult?.effectiveness_grade?.pattern_grade"></span>
+              <span class="ml-2 text-gray-400">(单股离散信号型, 命中率/条件超额评价替代IC/分层)</span>
+            </div>
+          </div>
+        </template>
+        <!-- 单股 技术/时序标准化/财务: 时间序列IC -->
+        <template x-if="evalResult?.single_pipeline_type !== 'signal'">
+          <div>
+            <div id="eval-single-ic-chart" style="height: 260px;"></div>
+            <div class="grid grid-cols-6 gap-2 text-center mt-2">
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IC均值</div><div class="text-lg font-bold" x-text="fmtNum(evalResult?.single_ic?.ic_mean)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IC标准差</div><div class="text-lg font-bold" x-text="fmtNum(evalResult?.single_ic?.ic_std)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IR</div><div class="text-lg font-bold" x-text="fmtNum(evalResult?.single_ic?.ir)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">RankIC均值</div><div class="text-lg font-bold" x-text="fmtNum(evalResult?.single_ic?.rank_ic_mean)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">IC胜率</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.single_ic?.ic_positive_ratio)"></div></div>
+              <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有效性</div><div class="text-lg font-bold" x-text="evalResult?.effectiveness_grade?.single_grade"></div></div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <!-- 事件信号因子: 信号评价 (离散信号型, 不走IC/分层; 含CDL形态/新高新低/趋势模式) -->
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm" x-show="isSignalType(evalResult?.factor_type)">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-gray-700">事件信号评价</h3>
+          <span class="text-xs text-gray-400" x-text="'调仓周期: ' + (evalResult?.pattern_evaluation?.rebal_period || 0) + '日 | 样本: ' + evalResult?.n_stocks + '只股票 × ' + evalResult?.n_dates + '个交易日'"></span>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-center mb-2">
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有信号占比</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.pattern_evaluation?.signal_frequency?.signal_ratio)"></div></div>
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">看涨占比</div><div class="text-lg font-bold text-red-600" x-text="fmtPct(evalResult?.pattern_evaluation?.signal_frequency?.bull_ratio)"></div></div>
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">看跌占比</div><div class="text-lg font-bold text-green-600" x-text="fmtPct(evalResult?.pattern_evaluation?.signal_frequency?.bear_ratio)"></div></div>
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">信号次数</div><div class="text-lg font-bold" x-text="evalResult?.pattern_evaluation?.signal_frequency?.signal_count"></div></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center mb-2">
+          <div class="bg-blue-50 rounded p-2"><div class="text-xs text-gray-500">看涨命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(evalResult?.pattern_evaluation?.hit_rate?.bull_hit_rate)"></div></div>
+          <div class="bg-blue-50 rounded p-2"><div class="text-xs text-gray-500">看跌命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(evalResult?.pattern_evaluation?.hit_rate?.bear_hit_rate)"></div></div>
+          <div class="bg-blue-50 rounded p-2"><div class="text-xs text-gray-500">整体命中</div><div class="text-lg font-bold text-blue-600" x-text="fmtPct(evalResult?.pattern_evaluation?.hit_rate?.overall_hit_rate)"></div></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">有信号收益</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.pattern_evaluation?.conditional_return?.signal_return)"></div></div>
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">无信号收益</div><div class="text-lg font-bold" x-text="fmtPct(evalResult?.pattern_evaluation?.conditional_return?.no_signal_return)"></div></div>
+          <div class="bg-gray-50 rounded p-2"><div class="text-xs text-gray-500">信号收益差</div><div class="text-lg font-bold text-purple-600" x-text="fmtPct(evalResult?.pattern_evaluation?.conditional_return?.signal_alpha)"></div></div>
+        </div>
+        <div class="mt-2 text-xs text-gray-500">
+          形态评级: <span class="font-bold" x-text="evalResult?.effectiveness_grade?.pattern_grade"></span>
+          <span class="ml-2 text-gray-400">(离散信号型因子, 命中率/条件超额评价替代IC/分层)</span>
+        </div>
+        <p class="mt-1 text-xs text-gray-400">信号频率解读: 稀疏形态(如CDL系列, 有信号占比通常仅几个百分点)信号少而精; 密集事件(如20日新高)有信号占比可达20%以上, 需结合命中率与信号收益差综合判断。多空语义: 含正负值的因子(CDL)按值符号判多空, 0/1单极性因子按因子方向(direction)解释。</p>
+      </div>
+      <div class="bg-white rounded-lg p-3 shadow-sm" x-show="evalResult?.factor_type !== 'single' && !isSignalType(evalResult?.factor_type)">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">IC 时序</h3>
+        <div id="eval-ic-chart" style="height: 300px;"></div>
+      </div>
+      <div class="bg-white rounded-lg p-3 shadow-sm" x-show="evalResult?.factor_type !== 'single' && !isSignalType(evalResult?.factor_type)">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">分层收益</h3>
+        <div id="eval-layer-chart" style="height: 300px;"></div>
+      </div>
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm" x-show="evalResult?.factor_type !== 'single' && !isSignalType(evalResult?.factor_type)">
+        <div class="grid grid-cols-6 gap-2 text-center">
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">IC均值</div>
+            <div class="text-lg font-bold" x-text="fmtNum(evalResult?.ic_timeseries?.ic_mean)"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">IC标准差</div>
+            <div class="text-lg font-bold" x-text="fmtNum(evalResult?.ic_timeseries?.ic_std)"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">IR</div>
+            <div class="text-lg font-bold" x-text="fmtNum(evalResult?.ic_timeseries?.ir)"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">RankIC</div>
+            <div class="text-lg font-bold" x-text="fmtNum(evalResult?.ic_timeseries?.rank_ic_mean)"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">IC胜率</div>
+            <div class="text-lg font-bold" x-text="fmtPct(evalResult?.ic_timeseries?.ic_positive_ratio)"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">样本数</div>
+            <div class="text-lg font-bold" x-text="evalResult?.ic_timeseries?.samples"></div>
+          </div>
+        </div>
+      </div>
+      <!-- D5 单因子诊断增强: 中性化前后对比 / 多持有期衰减 / 分年度IC稳定性 -->
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm"
+           x-show="!isSignalType(evalResult?.factor_type) && evalResult?.factor_type !== 'single' && (evalResult?.neutralize_contrast || (evalResult?.ic_decay || []).length || (evalResult?.yearly_ic || []).length)">
+        <div class="grid grid-cols-3 gap-3">
+          <div x-show="evalResult?.neutralize_contrast">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">中性化前后 IC 对比</h3>
+            <div class="grid grid-cols-2 gap-2 text-center">
+              <div class="bg-gray-50 rounded p-2">
+                <div class="text-xs text-gray-500">未中性化 IC</div>
+                <div class="text-lg font-bold" :class="icColor(evalResult?.neutralize_contrast?.raw_ic_mean)" x-text="fmtNum(evalResult?.neutralize_contrast?.raw_ic_mean)"></div>
+              </div>
+              <div class="bg-gray-50 rounded p-2">
+                <div class="text-xs text-gray-500">中性化后 IC</div>
+                <div class="text-lg font-bold" :class="icColor(evalResult?.neutralize_contrast?.neutralized_ic_mean)" x-text="fmtNum(evalResult?.neutralize_contrast?.neutralized_ic_mean)"></div>
+              </div>
+            </div>
+            <p class="mt-1 text-xs text-gray-400">中性化: <span x-text="evalResult?.neutralize_contrast?.neutralize"></span> · 差值大说明 IC 多来自风格暴露</p>
+          </div>
+          <div x-show="(evalResult?.ic_decay || []).length">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">多持有期 IC 衰减</h3>
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-gray-500 border-b">
+                  <th class="text-left py-1">持有期</th>
+                  <th class="text-right py-1">IC</th>
+                  <th class="text-right py-1">RankIC</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="d in (evalResult?.ic_decay || [])" :key="d.horizon">
+                  <tr class="border-b border-gray-50">
+                    <td class="py-1" x-text="d.horizon + '日'"></td>
+                    <td class="py-1 text-right font-mono" :class="icColor(d.ic_mean)" x-text="d.ic_mean == null ? '-' : fmtNum(d.ic_mean)"></td>
+                    <td class="py-1 text-right font-mono" :class="icColor(d.rank_ic_mean)" x-text="d.rank_ic_mean == null ? '-' : fmtNum(d.rank_ic_mean)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <p class="mt-1 text-xs text-gray-400">IC 随持有期的衰减速度 → 定最优调仓周期</p>
+          </div>
+          <div x-show="(evalResult?.yearly_ic || []).length">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700">分年度 IC 稳定性</h3>
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-gray-500 border-b">
+                  <th class="text-left py-1">年份</th>
+                  <th class="text-right py-1">IC均值</th>
+                  <th class="text-right py-1">正IC占比</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="y in (evalResult?.yearly_ic || [])" :key="y.year">
+                  <tr class="border-b border-gray-50">
+                    <td class="py-1" x-text="y.year"></td>
+                    <td class="py-1 text-right font-mono" :class="icColor(y.ic_mean)" x-text="fmtNum(y.ic_mean)"></td>
+                    <td class="py-1 text-right font-mono" x-text="fmtPct(y.positive_ratio)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <p class="mt-1 text-xs text-gray-400">各年 IC 是否稳定, 避免靠单一年份撑起来</p>
+          </div>
+        </div>
+      </div>
+      <!-- PerformanceWithCost (清华评价: 含交易成本) -->
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm" x-show="evalResult?.performance_with_cost">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">PerformanceWithCost (含交易成本, 清华day1_A)</h3>
+        <div class="grid grid-cols-4 gap-2 text-center mb-2">
+          <div class="bg-blue-50 rounded p-2">
+            <div class="text-xs text-gray-500">夏普比率</div>
+            <div class="text-lg font-bold text-blue-600" x-text="fmtNum(evalResult?.performance_with_cost?.sharpe_ratio)"></div>
+          </div>
+          <div class="bg-green-50 rounded p-2">
+            <div class="text-xs text-gray-500">年化收益</div>
+            <div class="text-lg font-bold text-green-600" x-text="fmtPct(evalResult?.performance_with_cost?.annual_return)"></div>
+          </div>
+          <div class="bg-orange-50 rounded p-2">
+            <div class="text-xs text-gray-500">换手率</div>
+            <div class="text-lg font-bold text-orange-600" x-text="fmtPct(evalResult?.performance_with_cost?.turnover)"></div>
+          </div>
+          <div class="bg-gray-50 rounded p-2">
+            <div class="text-xs text-gray-500">方向</div>
+            <div class="text-lg font-bold" x-text="evalResult?.performance_with_cost?.direction === 1 ? '正向' : '反向'"></div>
+          </div>
+        </div>
+        <div id="eval-pwc-chart" style="height: 200px;"></div>
+      </div>
+      <!-- 分位数收益 (清华day1_A GetQuantileRet) -->
+      <div class="col-span-2 bg-white rounded-lg p-3 shadow-sm" x-show="evalResult?.quantile_backtest">
+        <h3 class="text-sm font-semibold mb-2 text-gray-700">分位数收益 (清华day1_A, 年化)</h3>
+        <div id="eval-quantile-chart" style="height: 300px;"></div>
+      </div>
+    </div>
+  </div>
+

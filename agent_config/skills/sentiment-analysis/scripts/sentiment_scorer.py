@@ -13,7 +13,7 @@ LLM 情感分析评分器
 - summary: 一句话摘要
 
 用法：
-    python sentiment_scorer.py --news_file data/002594_news.json --output_dir output/
+    python sentiment_scorer.py --news_file data/002594_news.json --output_dir outputs/news/
     python sentiment_scorer.py --news_file data/资产重组_news.json
 """
 
@@ -168,7 +168,7 @@ def aggregate_sentiment(client: OpenAI, analyses: List[dict], model: str = "qwen
 def main():
     parser = argparse.ArgumentParser(description="LLM 情感分析评分器")
     parser.add_argument("--news_file", required=True, help="新闻 JSON 文件路径")
-    parser.add_argument("--output_dir", default="./output", help="输出目录")
+    parser.add_argument("--output_dir", default="./outputs/news", help="输出目录")
     parser.add_argument("--model", default="qwen-turbo", help="LLM 模型（默认 qwen-turbo）")
     parser.add_argument("--max_news", type=int, default=50, help="最大分析条数（默认 50）")
     args = parser.parse_args()

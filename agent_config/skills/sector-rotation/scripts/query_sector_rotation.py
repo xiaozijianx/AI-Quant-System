@@ -7,7 +7,7 @@
     detail  - 查询给定板块的最新明细 + 历史排名 + 指数K线 + 相关股票
     stock   - 给定股票代码, 先查其所属申万二级板块, 再查该板块详情
 
-复用 sector_rotation.rotation_store 的查询函数, 不依赖 HTTP 服务。
+复用 services/rotation/rotation_store 的查询函数, 不依赖 HTTP 服务。
 """
 from __future__ import annotations
 import sys
@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
-from sector_rotation.rotation_store import (
+from services.rotation.rotation_store import (
     load_matrix,
     get_detail,
     get_sector_history,
@@ -29,7 +29,7 @@ from sector_rotation.rotation_store import (
     get_available_dates,
     find_sectors,
 )
-from sector_rotation.rotation_core import execute_query
+from services.rotation.rotation_core import execute_query
 
 # 指标中文含义 (输出时附带, 帮助 LLM 理解数值方向)
 # Z-score 指标均为截面标准化: 0=全部板块均值, 正值=强于均值, 负值=弱于均值

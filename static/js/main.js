@@ -1,6 +1,8 @@
-// AI 量化交易系统 -- 通用前端工具
+// AI 量化交易系统 -- 通用前端工具 (Stage 0 升级为全站公共层)
 // =============================================================
 // 提供:  请求封装 / 数字格式化 / 时间格式化 / 通知
+//        SSE 流式封装 App.sse / Plotly 图表封装 App.chart / 页面状态 App.state
+// 文件仍命名为 main.js (base.html 引用路径不变), 后续阶段拆分时再更名 common.js
 
 window.App = (function () {
   'use strict';
@@ -58,6 +60,123 @@ window.App = (function () {
     return text;
   }
 
+  // ====== SSE 统一封装 ======
+  // 统一各页面的两种 EventSource 写法 (data_collection/morning 等)。
+  // 用法:
+  //   const es = App.sse('/api/xxx/stream', {
+  //     onEvent(name, data, raw),   // name: 事件名; data: JSON 解析结果(失败时为原文); raw: 原文本
+  //     onDone(),                   // 服务端 done 事件或连接关闭
+  //     onError(err),               // 连接错误
+  //   });
+  //   es.close();  // 主动断开
+  // 约定: 后端 SSE 的终止事件名为 done (各流式路由现状一致)。
+  function sse(url, handlers = {}) {
+    const { onEvent, onDone, onError } = handlers;
+    const es = new EventSource(url);
+
+    // SSE 默认 message 事件 + 自定义命名事件都接住
+    es.onmessage = (ev) => {
+      dispatch('message', ev);
+    };
+    // 常见自定义事件名集合 (后端 data_collection/morning/factor 挖掘流已使用)
+    ['start', 'log', 'progress', 'step', 'success', 'error', 'restart',
+     'heartbeat', 'result', 'candidates', 'finish', 'warn'].forEach((name) => {
+      es.addEventListener(name, (ev) => dispatch(name, ev));
+    });
+    es.onerror = (err) => {
+      // EventSource 自动重连; done 后服务端关闭也会走这里, 由 closed 标志区分
+      if (es._closed) return;
+      if (onError) onError(err);
+    };
+
+    function dispatch(name, ev) {
+      const raw = typeof ev.data === 'string' ? ev.data : '';
+      let data = raw;
+      if (raw) {
+        try { data = JSON.parse(raw); } catch (e) { /* 保留原文 */ }
+      }
+      if (name === 'done') {
+        close();
+        if (onDone) onDone(data, raw);
+        return;
+      }
+      if (onEvent) onEvent(name, data, raw);
+      // success/finish 事件视为流结束 (各路由口径: 事件名不同但语义一致)
+      if (name === 'success' || name === 'finish') {
+        close();
+        if (onDone) onDone(data, raw);
+      }
+    }
+
+    function close() {
+      es._closed = true;
+      es.close();
+    }
+
+    return { close, raw: es };
+  }
+
+  // ====== Plotly 图表统一封装 ======
+  // 统一各页内联的 layout 主题 (字号/配色/margin 基线), 版本由 base.html 的
+  // plotly block 统一为 2.35.2。各页传入差异部分 (title/xaxis/yaxis 等)。
+  function chartPlotly(el, data, layout, config) {
+    if (typeof Plotly === 'undefined' || !el) return;
+    const baseLayout = {
+      margin: { l: 56, r: 24, t: 40, b: 36 },
+      font: { family: 'system-ui, sans-serif', size: 12 },
+      paper_bgcolor: 'transparent',
+      plot_bgcolor: 'transparent',
+      showlegend: true,
+      legend: { orientation: 'h', y: 1.08 },
+      xaxis: { gridcolor: 'rgba(0,0,0,0.06)' },
+      yaxis: { gridcolor: 'rgba(0,0,0,0.06)' },
+    };
+    const merged = Object.assign({}, baseLayout, layout || {});
+    // 深合并一层的 xaxis/yaxis/legend/margin (调用方可覆盖基线)
+    ['xaxis', 'yaxis', 'legend', 'margin'].forEach((k) => {
+      if (layout && layout[k]) {
+        merged[k] = Object.assign({}, baseLayout[k] || {}, layout[k]);
+      }
+    });
+    const cfg = Object.assign(
+      { responsive: true, displayModeBar: 'hover', modeBarButtonsToRemove: ['lasso2d', 'select2d'] },
+      config || {}
+    );
+    return Plotly.react(el, data, merged, cfg);
+  }
+
+  // ====== 页面状态持久化封装 (后端 /api/page-settings/{namespace}) ======
+  // 统一 factor/quantgp 页的裸 fetch 写法 与 morning/sector 等页的 App.get 写法。
+  // 用法:
+  //   const st = App.state('my_page');
+  //   const saved = await st.load();          // 返回后端存储对象 (空时返回 {})
+  //   await st.save({ a: 1 });               // 整体保存 (后端为全量替换语义)
+  //   await st.patch({ b: 2 });               // 读-改-写合并保存
+  const state = (namespace) => {
+    const base = '/api/page-settings/' + encodeURIComponent(namespace);
+    async function load() {
+      try {
+        const r = await request(base, { method: 'GET' });
+        if (r && typeof r === 'object' && r.ok === false) return {};
+        return (r && typeof r === 'object' && r.settings) ? r.settings : (r && typeof r === 'object' ? r : {});
+      } catch (e) {
+        return {};
+      }
+    }
+    async function save(obj) {
+      try {
+        return await post(base, obj);
+      } catch (e) {
+        return { ok: false, message: String(e) };
+      }
+    }
+    async function patch(obj) {
+      const cur = await load();
+      return save(Object.assign({}, cur, obj));
+    }
+    return { load, save, patch, namespace };
+  };
+
   /** 数字格式化 */
   function fmtNum(v, digits = 2) {
     if (v === null || v === undefined || isNaN(v)) return '-';
@@ -102,9 +221,11 @@ window.App = (function () {
       success: 'bg-green-600',
       warn:    'bg-yellow-600',
       danger:  'bg-red-600',
+      // 兼容各页误传的 error (修复前静默降级为 info 的问题)
+      error:   'bg-red-600',
     };
     el.className =
-      'fixed top-4 right-4 z-[200] max-w-md px-4 py-3 rounded-lg text-white shadow-2xl text-sm font-medium leading-snug ring-2 ring-white/20 ' +
+      'fixed top-4 right-4 z-[200] max-w-md px-4 py-3 rounded-lg text-white shadow-2xl text-sm font-medium leading-snug ring-2 ring-white/20 whitespace-pre-line ' +
       (colors[kind] || colors.info);
     el.textContent = msg;
     document.body.appendChild(el);
@@ -258,6 +379,7 @@ window.App = (function () {
 
   return {
     get, post, request,
+    sse, chart: { plotly: chartPlotly }, state,
     fmtNum, fmtPct, fmtSign, pnlClass, fmtSignalTs, toast,
     alertLevelText, alertBadgeClass, alertTimeText, alertMsgText,
     initLayout, toggleRail,

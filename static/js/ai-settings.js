@@ -1041,7 +1041,7 @@ const AI_SETTINGS = {
         try {
             const data = await this.apiGet(`/api/chat/cron/last_run/${encodeURIComponent(name)}`);
             if (data.status === 'ok') {
-                alert(`${name} 上次运行:\n${JSON.stringify(data.last_run, null, 2)}`);
+                App.toast(`${name} 上次运行:\n${JSON.stringify(data.last_run, null, 2)}`, 'info');
             } else {
                 this.toast(data.message || '无运行记录');
             }
