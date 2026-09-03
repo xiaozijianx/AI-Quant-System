@@ -178,7 +178,7 @@ class LiveTradingLoop:
     def __init__(self,
                  watch_stocks: List[str],
                  capital: float = 1_000_000,
-                 state_file: str = "outputs/live_state.json",
+                 state_file: str = "outputs/live/live_state.json",
                  max_daily_loss_pct: float = -0.02,
                  dry_run: bool = True,
                  signal_evaluator: Optional[Callable[[str, "MarketDataProvider", float], dict]] = None,
@@ -736,7 +736,7 @@ def main():
     parser.add_argument("--interval", type=int, default=60,
                         help="循环间隔秒, 默认 60")
     parser.add_argument("--once", action="store_true", help="只跑一次")
-    parser.add_argument("--state-file", default="outputs/live_state.json")
+    parser.add_argument("--state-file", default="outputs/live/live_state.json")
     args = parser.parse_args()
 
     stocks = [s.strip() for s in args.stocks.split(",") if s.strip()]

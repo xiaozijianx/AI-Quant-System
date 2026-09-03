@@ -24,6 +24,7 @@ server_*.err
 server_*.out
 
 # ---- 运行时状态（可选恢复，不入库） ----
-outputs/live_state.json
-outputs/live_state_real.json
-outputs/live_approvals.json
+outputs/live/live_state.json
+outputs/live/live_state_real.json
+outputs/live/live_approvals.json
+outputs/live/real_pnl_history.json

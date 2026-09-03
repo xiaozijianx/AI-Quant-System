@@ -14,7 +14,7 @@ V1 简化策略 (设计文档同步):
     - 持仓快照: 用调用时刻的当前持仓 (不做时段加权 -- sim 区间一般不长)
     - 境外标的 (eg. 513100.SH 纳指 ETF / 港股 / QDII): 归到 "境外/其他" 分组,
       参与组合权重但 benchmark 那边对应权重 0 (会进入"配置效应")
-    - 行业字典 cache: outputs/sw1_industry_map.json, TTL=7 天 (申万归属基本不动)
+    - 行业字典 cache: outputs/cache/sw1_industry_map.json, TTL=7 天 (申万归属基本不动)
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ setup_sys_path()
 # ============================================================
 
 # 申万一级行业 cache 文件 + TTL
-_INDUSTRY_CACHE_PATH = OUTPUTS_DIR / "sw1_industry_map.json"
+_INDUSTRY_CACHE_PATH = OUTPUTS_DIR / "cache" / "sw1_industry_map.json"
 _INDUSTRY_CACHE_TTL_DAYS = 7
 
 # 默认基准
@@ -87,7 +87,7 @@ def build_industry_map(force_refresh: bool = False) -> Dict[str, Any]:
     }
 
     数据来源: xtquant.xtdata.get_sector_list() + get_stock_list_in_sector()
-    cache 文件: outputs/sw1_industry_map.json (TTL 7 天)
+    cache 文件: outputs/cache/sw1_industry_map.json (TTL 7 天)
     """
     if not force_refresh:
         cache = _load_industry_cache()

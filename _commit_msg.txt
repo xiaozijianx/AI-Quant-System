@@ -1,0 +1,21 @@
+refactor: outputs 产物按域分层并统一输出位置
+
+将全部输出产物收敛到 outputs/ 按域子目录, 使产出与页面分层逻辑一致:
+
+- outputs/live/   实盘/模拟引擎状态 (live_state, live_state_real, live_approvals, real_pnl_history)
+- outputs/review/ 复盘归因 (strategy_registry, wf_experiment)
+- outputs/dragon/ 龙头回测产物 (dragon_curve/trades)
+- outputs/cache/  引擎缓存 (sw1_industry_map)
+- outputs/morning/ 晨会报告 (自 services/morning/brief/outputs/reports 统一迁入, 68 份随迁)
+- outputs/reports/ 研报 + pitch_deck 归档
+
+- lib/paths.py 新增 OUTPUTS_{LIVE,REVIEW,DRAGON,CACHE,MORNING}_DIR 及各文件常量,
+  晨报 OUTPUTS_RESEARCH 指向根 outputs/morning, 消除"服务包内第二个输出根"
+- 全部生产/消费方收敛到 paths 常量: live_simulator/live core/trading_plan/
+  state_store/live_loop/strategy_lifecycle/brinson_real/dragon_backtest/morning graph 等
+- services/live/core.py 顺带清除重复定义(输出路径曾定义两处)
+- .gitignore 运行时状态路径同步到 outputs/live/
+
+验证: 旧路径代码残留仅剩说明性 docstring(已同步更新); app 导入 223 路由;
+system/health(晨报 34 份)、morning/cache、review/registry、trade-plans、dragon-review
+运行时全部 200。

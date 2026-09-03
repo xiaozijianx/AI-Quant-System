@@ -8,7 +8,7 @@
     - 策略: 从 config/strategies.yaml 读路由表, 注入 StrategyRouter 到 loop
     - 行情: xtdata 真实数据
 
-数据写到 outputs/live_state.json, dashboard 5 秒轮询自动刷新
+数据写到 outputs/live/live_state.json, dashboard 5 秒轮询自动刷新
 """
 
 from __future__ import annotations
@@ -20,7 +20,9 @@ from pathlib import Path
 from typing import List, Optional
 
 from lib.stock_utils import normalize_code
-from lib.paths import OUTPUTS_DIR, CONFIG_DIR
+from lib.paths import (
+    OUTPUTS_DIR, CONFIG_DIR, OUTPUTS_LIVE_STATE, OUTPUTS_LIVE_STATE_REAL,
+)
 
 
 CONFIG_FILE = Path(__file__).resolve().parent.parent / "config" / "mock_positions.yaml"
@@ -336,7 +338,7 @@ def seed_historical_orders(force: bool = False, state_file=None, mock_cfg_file=N
 
     Args:
         force: True=强制覆盖已有 orders
-        state_file: 状态文件路径, 不传默认 outputs/live_state.json (向后兼容 cli)
+        state_file: 状态文件路径, 不传默认 outputs/live/live_state.json (向后兼容 cli)
         mock_cfg_file: 持仓配置文件路径, 不传默认 config/mock_positions.yaml (向后兼容 cli)
         strategy_file: 策略配置文件路径, 不传默认 config/strategies.yaml (向后兼容 cli)
 
@@ -443,7 +445,7 @@ class LiveSimRunner:
 
     参数:
         plan_type:       "sim" 或 "live", 决定交易计划类型
-        state_file:      状态文件路径 (如 outputs/live_state.json)
+        state_file:      状态文件路径 (如 outputs/live/live_state.json)
         strategy_file:   策略配置文件路径 (如 config/strategies.yaml)
         watch_pool_file: 自选监控池文件路径 (如 config/watch_pool.yaml)
         mock_config_file: 初始持仓配置文件路径 (如 config/mock_positions.yaml)
@@ -1060,7 +1062,7 @@ class LiveSimRunner:
 # 模拟盘引擎单例
 SIM_RUNNER = LiveSimRunner(
     plan_type="sim",
-    state_file=str(OUTPUTS_DIR / "live_state.json"),
+    state_file=str(OUTPUTS_LIVE_STATE),
     strategy_file=str(CONFIG_DIR / "strategies.yaml"),
     watch_pool_file=str(CONFIG_DIR / "watch_pool.yaml"),
     mock_config_file=str(CONFIG_DIR / "mock_positions.yaml"),
@@ -1070,7 +1072,7 @@ SIM_RUNNER = LiveSimRunner(
 # 实盘引擎单例
 REAL_RUNNER = LiveSimRunner(
     plan_type="live",
-    state_file=str(OUTPUTS_DIR / "live_state_real.json"),
+    state_file=str(OUTPUTS_LIVE_STATE_REAL),
     strategy_file=str(CONFIG_DIR / "strategies_real.yaml"),
     watch_pool_file=str(CONFIG_DIR / "watch_pool_real.yaml"),
     mock_config_file=str(CONFIG_DIR / "mock_positions_real.yaml"),
@@ -1096,7 +1098,7 @@ if __name__ == "__main__":
         epilog=("用法:\n"
                 "  python lib/live_simulator.py --backfill-orders\n"
                 "        把 SIM_HISTORY_START_DATE (默认 2026-04-01) 至今的策略成交\n"
-                "        写到 outputs/live_state.json/orders, 让 /review 流水卡有数据\n"
+                "        写到 outputs/live/live_state.json/orders, 让 /review 流水卡有数据\n"
                 "  python lib/live_simulator.py --backfill-orders --force\n"
                 "        即使 orders 已有也强制覆盖 (重生成)\n"))
     parser.add_argument("--backfill-orders", action="store_true",

@@ -29,7 +29,8 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PLANS_DIR = PROJECT_ROOT / "data" / "trading_plans"
-OUTPUTS_LIVE_STATE = PROJECT_ROOT / "outputs" / "live_state.json"
+# 复读模拟盘状态文件 (统一由 lib.paths 锚定到 outputs/live/)
+from lib.paths import OUTPUTS_LIVE_STATE
 
 
 def _load_db_config() -> dict:

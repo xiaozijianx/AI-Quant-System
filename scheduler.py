@@ -14,7 +14,7 @@ TradingScheduler -- A 股交易日自动运行: 数据增量 / 晨会简报 / �
     14:55   job_stop_engine    -> 停止主循环
 
 每个任务都可以通过 Web「系统状态」页面独立开关, 配置保存在 data/scheduler_config.json。
-主循环状态在 outputs/live_state.json，进程重启可从最近一次 state 恢复。
+主循环状态在 outputs/live/live_state.json，进程重启可从最近一次 state 恢复。
 
 用法:
     python scheduler.py

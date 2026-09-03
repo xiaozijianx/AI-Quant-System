@@ -453,8 +453,8 @@ def run(
         print("  [INFO] 该参数下无任何候选, 终止")
         return
 
-    from lib.paths import OUTPUTS_DIR
-    out_dir = out_dir or OUTPUTS_DIR
+    from lib.paths import OUTPUTS_DRAGON_DIR
+    out_dir = out_dir or OUTPUTS_DRAGON_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for hold in holds:

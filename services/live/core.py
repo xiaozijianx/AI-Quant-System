@@ -15,6 +15,8 @@ import yaml as _yaml   # 读写 binding_source.yaml / execution_mode 用
 from lib.paths import (
     setup_sys_path,
     OUTPUTS_LIVE_STATE,
+    OUTPUTS_LIVE_STATE_REAL,
+    OUTPUTS_APPROVALS,
     OUTPUTS_DIR,
     PROJECT_ROOT,
     CONFIG_DIR,
@@ -36,20 +38,7 @@ from lib.stock_utils import get_stock_info, normalize_code
 setup_sys_path()
 
 
-# 实盘状态文件路径
-OUTPUTS_LIVE_STATE_REAL = OUTPUTS_DIR / "live_state_real.json"
-
-# 配置文件路径 (基于 PROJECT_ROOT, 不依赖 CWD)
-WATCH_POOL_FILE = str(CONFIG_DIR / "watch_pool.yaml")
-WATCH_POOL_REAL_FILE = str(CONFIG_DIR / "watch_pool_real.yaml")
-STRATEGIES_FILE = str(CONFIG_DIR / "strategies.yaml")
-STRATEGIES_REAL_FILE = str(CONFIG_DIR / "strategies_real.yaml")
-MOCK_POSITIONS_FILE = str(CONFIG_DIR / "mock_positions.yaml")
-MOCK_POSITIONS_REAL_FILE = str(CONFIG_DIR / "mock_positions_real.yaml")
-
-
-OUTPUTS_LIVE_STATE_REAL = OUTPUTS_DIR / "live_state_real.json"
-
+# 实盘状态/授权文件路径 (统一由 lib.paths 锚定到 outputs/live/)
 WATCH_POOL_FILE = str(CONFIG_DIR / "watch_pool.yaml")
 WATCH_POOL_REAL_FILE = str(CONFIG_DIR / "watch_pool_real.yaml")
 STRATEGIES_FILE = str(CONFIG_DIR / "strategies.yaml")
@@ -614,7 +603,7 @@ def _get_real_trader():
     _REAL_TRADER = trader
     return trader
 
-_APPROVALS_FILE = OUTPUTS_DIR / "live_approvals.json"
+_APPROVALS_FILE = OUTPUTS_APPROVALS
 _APPROVAL_TTL_SEC = 300   # 5 分钟
 
 def _signal_id(sig: dict) -> str:

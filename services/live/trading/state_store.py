@@ -26,7 +26,7 @@ from typing import Any, Optional
 class StateStore:
     """JSON 文件版 state 存储"""
 
-    def __init__(self, state_file: str = "outputs/live_state.json"):
+    def __init__(self, state_file: str = "outputs/live/live_state.json"):
         self.state_file = Path(state_file)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 

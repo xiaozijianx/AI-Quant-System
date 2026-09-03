@@ -24,10 +24,20 @@ ATTRIBUTION_DIR        = PROJECT_ROOT / "services" / "review" / "attribution"
 PARAMETER_TUNING_DIR   = PROJECT_ROOT / "services" / "review" / "parameter_tuning"
 STRATEGY_LIFECYCLE_DIR = PROJECT_ROOT / "services" / "review" / "strategy_lifecycle"
 
-# 关键产出
-OUTPUTS_LIVE_STATE      = OUTPUTS_DIR / "live_state.json"
-OUTPUTS_RESEARCH        = MORNING_BRIEF_DIR / "outputs" / "reports"
-OUTPUTS_EVOLVE_REGISTRY = OUTPUTS_DIR / "strategy_registry.json"
+# 关键产出 (按域分子目录, 与页面分层一致)
+OUTPUTS_LIVE_DIR    = OUTPUTS_DIR / "live"        # 实盘/模拟引擎状态
+OUTPUTS_REVIEW_DIR  = OUTPUTS_DIR / "review"      # 复盘归因 (策略注册表/WF实验)
+OUTPUTS_DRAGON_DIR  = OUTPUTS_DIR / "dragon"      # 龙头回测产物
+OUTPUTS_CACHE_DIR   = OUTPUTS_DIR / "cache"       # 引擎缓存 (行业映射等)
+OUTPUTS_MORNING_DIR = OUTPUTS_DIR / "morning"     # 晨会报告
+
+OUTPUTS_LIVE_STATE      = OUTPUTS_LIVE_DIR / "live_state.json"
+OUTPUTS_LIVE_STATE_REAL = OUTPUTS_LIVE_DIR / "live_state_real.json"
+OUTPUTS_APPROVALS       = OUTPUTS_LIVE_DIR / "live_approvals.json"
+OUTPUTS_REAL_PNL        = OUTPUTS_LIVE_DIR / "real_pnl_history.json"
+OUTPUTS_EVOLVE_REGISTRY = OUTPUTS_REVIEW_DIR / "strategy_registry.json"
+OUTPUTS_INDUSTRY_CACHE  = OUTPUTS_CACHE_DIR / "sw1_industry_map.json"
+OUTPUTS_RESEARCH        = OUTPUTS_MORNING_DIR
 
 # 全项目唯一环境变量文件
 ENV_FILE = PROJECT_ROOT / ".env"
@@ -41,6 +51,9 @@ def setup_sys_path() -> None:
             sys.path.insert(0, sp)
 
 
-# 确保 outputs 与 data 目录存在
+# 确保 outputs 及其按域子目录存在
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+for _sub in (OUTPUTS_LIVE_DIR, OUTPUTS_REVIEW_DIR, OUTPUTS_DRAGON_DIR,
+             OUTPUTS_CACHE_DIR, OUTPUTS_MORNING_DIR):
+    _sub.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)

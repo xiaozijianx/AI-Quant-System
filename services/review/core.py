@@ -14,10 +14,11 @@ from lib.paths import (
     OUTPUTS_DIR,
     OUTPUTS_LIVE_STATE,
     OUTPUTS_EVOLVE_REGISTRY,
+    OUTPUTS_REAL_PNL,
 )
 
 setup_sys_path()
-REAL_PNL_HISTORY_PATH: Path = OUTPUTS_DIR / "real_pnl_history.json"
+REAL_PNL_HISTORY_PATH: Path = OUTPUTS_REAL_PNL
 
 def _load_real_pnl_history() -> dict:
     if not REAL_PNL_HISTORY_PATH.exists():

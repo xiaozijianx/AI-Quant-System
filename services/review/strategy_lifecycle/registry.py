@@ -87,7 +87,7 @@ class StrategyRecord:
 class StrategyRegistry:
     """策略注册中心 -- JSON 文件存储"""
 
-    def __init__(self, registry_file: str = "outputs/strategy_registry.json",
+    def __init__(self, registry_file: str = "outputs/review/strategy_registry.json",
                  total_capital: float = 1_000_000):
         self.registry_file = Path(registry_file)
         self.registry_file.parent.mkdir(parents=True, exist_ok=True)
@@ -337,7 +337,7 @@ def demo():
     print(f"{'='*78}")
 
     # 初始化 5 个不同阶段的策略
-    reg = StrategyRegistry("outputs/strategy_registry.json", total_capital=1_000_000)
+    reg = StrategyRegistry("outputs/review/strategy_registry.json", total_capital=1_000_000)
 
     test_strategies = [
         ("dragon_first_board", "23-CASE-C 龙头首板战法",

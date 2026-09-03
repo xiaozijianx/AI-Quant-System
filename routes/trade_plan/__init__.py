@@ -52,12 +52,12 @@ def _today() -> str:
 
 def _load_position_for_plan(code: str, plan_type: str) -> dict:
     """为生成交易计划读取对应持仓: sim 读 live_state.json, live 读 live_state_real.json"""
-    from lib.paths import OUTPUTS_DIR
+    from lib.paths import OUTPUTS_LIVE_STATE_REAL
     code = normalize_code(code)
 
-    # sim → outputs/live_state.json, live → outputs/live_state_real.json
+    # sim → outputs/live/live_state.json, live → outputs/live/live_state_real.json
     if plan_type == "live":
-        state_file = OUTPUTS_DIR / "live_state_real.json"
+        state_file = OUTPUTS_LIVE_STATE_REAL
     else:
         state_file = OUTPUTS_LIVE_STATE
 

@@ -581,7 +581,8 @@ def report_node(state: dict) -> dict:
 
     report_html = _md_to_html(report_md)
 
-    output_dir = THIS_DIR / "outputs" / "reports"
+    from lib.paths import OUTPUTS_MORNING_DIR
+    output_dir = OUTPUTS_MORNING_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     md_path = output_dir / f"morning_brief_{ts}.md"
